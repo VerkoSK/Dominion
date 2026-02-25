@@ -6,7 +6,9 @@
         "CCC"
     ],
     "key": {
-        "C": { "item": "nationsforge:nation_coin" }
+        "C": {
+            "item": "nationsforge:nation_coin"
+        }
     },
     "result": {
         "item": "minecraft:gold_ingot"

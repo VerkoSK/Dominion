@@ -327,10 +327,12 @@ public class NationsCommand {
                                                                                                 .getPlayerOrException();
                                                                                 NationManager.depositCoins(
                                                                                                 ctx.getSource().getServer(),
-                                                                                                player.getUUID(), amount);
+                                                                                                player.getUUID(),
+                                                                                                amount);
                                                                         } catch (Exception e) {
                                                                                 ctx.getSource().sendFailure(
-                                                                                                Component.literal("§cMust be run as a player."));
+                                                                                                Component.literal(
+                                                                                                                "§cMust be run as a player."));
                                                                         }
                                                                         return 1;
                                                                 })))
@@ -346,13 +348,16 @@ public class NationsCommand {
                                                                                                 .getPlayerOrException();
                                                                                 var r = NationManager.withdrawCoins(
                                                                                                 ctx.getSource().getServer(),
-                                                                                                player.getUUID(), amount);
+                                                                                                player.getUUID(),
+                                                                                                amount);
                                                                                 if (!r.ok())
                                                                                         ctx.getSource().sendFailure(
-                                                                                                        Component.literal("§c" + r.name()));
+                                                                                                        Component.literal(
+                                                                                                                        "§c" + r.name()));
                                                                         } catch (Exception e) {
                                                                                 ctx.getSource().sendFailure(
-                                                                                                Component.literal("§cMust be run as a player."));
+                                                                                                Component.literal(
+                                                                                                                "§cMust be run as a player."));
                                                                         }
                                                                         return 1;
                                                                 }))));

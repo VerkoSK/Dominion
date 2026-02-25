@@ -12,14 +12,14 @@ import java.util.List;
 /**
  * Nation Coin — the universal currency of the Dominion economy.
  *
- * Crafted from gold:  1 Gold Ingot → 9 Nation Coins (and back again).
+ * Crafted from gold: 1 Gold Ingot → 9 Nation Coins (and back again).
  * Nations accrue coins automatically each server tick-cycle based on
  * territory, active members and diplomatic relations.
  *
  * Players deposit coins into their national treasury via:
- *   /nation deposit <amount>
+ * /nation deposit <amount>
  * Sovereign / Chancellor ranks may withdraw via:
- *   /nation withdraw <amount>
+ * /nation withdraw <amount>
  */
 public class NationCoinItem extends Item {
 

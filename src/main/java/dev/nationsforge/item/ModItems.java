@@ -12,8 +12,8 @@ import net.minecraftforge.registries.RegistryObject;
  */
 public class ModItems {
 
-    public static final DeferredRegister<Item> ITEMS =
-            DeferredRegister.create(ForgeRegistries.ITEMS, NationsForge.MOD_ID);
+    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS,
+            NationsForge.MOD_ID);
 
     /** The national currency — crafted from gold, deposited into the treasury. */
     public static final RegistryObject<Item> NATION_COIN = ITEMS.register("nation_coin",

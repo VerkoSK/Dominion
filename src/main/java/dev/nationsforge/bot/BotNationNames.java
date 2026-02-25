@@ -52,7 +52,9 @@ public final class BotNationNames {
             "Scholars who inherited the ruins of an older and mightier civilization."
     };
 
-    /** Packed ARGB colours used for bot nation colour assignment (cycled by index). */
+    /**
+     * Packed ARGB colours used for bot nation colour assignment (cycled by index).
+     */
     public static final int[] BOT_COLOURS = {
             0xCC4444, // Red
             0x3C44AA, // Blue
@@ -69,7 +71,7 @@ public final class BotNationNames {
             0xB02E26, // Dark Red
             0x474F52, // Dark Gray
             0xF38BAA, // Pink
-            0x1D1D21  // Black
+            0x1D1D21 // Black
     };
 
     public static String randomName(Random rng, Set<String> usedNames) {

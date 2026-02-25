@@ -47,8 +47,18 @@ public class Nation {
      * white.
      */
     private NationFlag flag = new NationFlag();
-    /** True if this nation is AI-controlled (bot). Bot nations are never disbanded by players. */
+    /**
+     * True if this nation is AI-controlled (bot). Bot nations are never disbanded
+     * by players.
+     */
     private boolean bot = false;
+    /**
+     * Capital block coordinates (X and Z). Used by bot nations to mark their
+     * seat of power and anchor FTBChunks territory claiming.
+     * Defaults to (0, 0) until set by WorldBotGenerator.
+     */
+    private int capitalX = 0;
+    private int capitalZ = 0;
 
     // ── Constructor ──────────────────────────────────────────────────────────────
 
@@ -249,6 +259,10 @@ public class Nation {
         this.bot = bot;
     }
 
+    public int getCapitalX() { return capitalX; }
+    public int getCapitalZ() { return capitalZ; }
+    public void setCapital(int x, int z) { this.capitalX = x; this.capitalZ = z; }
+
     // ── NBT serialisation ────────────────────────────────────────────────────────
 
     public CompoundTag toNBT() {
@@ -267,6 +281,8 @@ public class Nation {
         tag.putLong("createdAt", createdAt);
         tag.put("flag", flag.toNBT());
         tag.putBoolean("bot", bot);
+        tag.putInt("capitalX", capitalX);
+        tag.putInt("capitalZ", capitalZ);
 
         // Members
         ListTag memberList = new ListTag();
@@ -317,6 +333,8 @@ public class Nation {
         if (tag.contains("flag"))
             nation.flag = NationFlag.fromNBT(tag.getCompound("flag"));
         nation.bot = tag.getBoolean("bot");
+        nation.capitalX = tag.getInt("capitalX");
+        nation.capitalZ = tag.getInt("capitalZ");
 
         ListTag memberList = tag.getList("members", Tag.TAG_COMPOUND);
         for (int i = 0; i < memberList.size(); i++) {

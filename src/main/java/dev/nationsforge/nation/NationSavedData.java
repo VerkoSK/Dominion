@@ -68,9 +68,11 @@ public class NationSavedData extends SavedData {
         setDirty();
         return nation;
     }
+
     /**
      * Creates a bot (AI-controlled) nation. The botLeaderId is a fake UUID that
-     * is deterministically derived from the nation's tag and is never a real player.
+     * is deterministically derived from the nation's tag and is never a real
+     * player.
      */
     public Nation createBotNation(String name, String tag, int colour, UUID botLeaderId) {
         UUID id = UUID.randomUUID();
@@ -81,6 +83,7 @@ public class NationSavedData extends SavedData {
         setDirty();
         return nation;
     }
+
     public void removeNation(UUID nationId) {
         Nation nation = nations.remove(nationId);
         if (nation != null) {
@@ -176,7 +179,8 @@ public class NationSavedData extends SavedData {
         return Collections.unmodifiableMap(playerNation);
     }
 
-    // ── World bot flag ───────────────────────────────────────────────────────────────
+    // ── World bot flag
+    // ───────────────────────────────────────────────────────────────
 
     public boolean isWorldBotGenerated() {
         return worldBotGenerated;

@@ -6,6 +6,34 @@ Versioning follows **MAJOR.MINOR.PATCH** — patch bumps on every build.
 
 ---
 
+## [1.2.1] — 2026-02-26
+
+### Fixed
+- **FTB Teams integration** — team member add/remove now uses Java reflection
+  (`AbstractTeam.addMember` / `removeMember`) instead of non-existent console
+  commands, so players are correctly added to/removed from their nation's team.
+- **FTBTeamsReflectionHelper** — fixed `getManager(MinecraftServer)` call to the
+  correct no-arg `getManager()`, resolving server-team UUID lookups for FTBChunks.
+
+### Added
+- **Bot nation capitals** — each bot nation now stores `capitalX`/`capitalZ`
+  coordinates (persisted in NBT). Capitals are spread across ±4000 blocks with
+  a minimum 400-block spacing between any two nations.
+- **Bot FTB Teams + chunk claiming** — `WorldBotGenerator` now creates a FTB
+  server team (`dominion_TAG`) and claims territory around each capital via
+  `ftbchunks admin claim_as` so bot nations visibly own land from day one.
+- **More bot nations** — world generation now spawns 15–24 bot nations (up from 8–14).
+- **Browse panel — nation flag** — clicking a nation in Browse now shows its
+  32×32 banner flag rendered via 2× PoseStack scaling.
+- **Browse panel — full stats** — detail panel now shows Members, Territory,
+  Treasury, Score, Recruitment, relation counts (⚔ Allies Trade Rivals),
+  capital coordinates for bots, and description. List rows also display
+  territory chunk count.
+- **Browse panel — bot badge** — bot nations are marked `[BOT NATION]` in the
+  detail panel and `[AI]` in the list.
+
+---
+
 ## [1.2.0] — 2026-02-25
 
 ### Added

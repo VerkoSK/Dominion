@@ -19,9 +19,9 @@ import java.util.Random;
  *
  * Each cycle the AI:
  * <ol>
- *   <li>Collects passive income from territory and "members".</li>
- *   <li>Rolls a random event: expand, recruit, diplomacy or announcement.</li>
- *   <li>Recalculates power.</li>
+ * <li>Collects passive income from territory and "members".</li>
+ * <li>Rolls a random event: expand, recruit, diplomacy or announcement.</li>
+ * <li>Recalculates power.</li>
  * </ol>
  *
  * Event probabilities are adjusted per {@link BotPersonality} stored in
@@ -125,7 +125,8 @@ public final class BotNationAI {
 
     private static void handleExpand(MinecraftServer server, Nation bot, Random rng) {
         long cost = 200L + rng.nextInt(300);
-        if (bot.getTreasury() < cost) return;
+        if (bot.getTreasury() < cost)
+            return;
         long gain = 1 + rng.nextInt(4);
         bot.setTerritory(bot.getTerritory() + gain);
         bot.addTreasury(-cost);
@@ -153,7 +154,8 @@ public final class BotNationAI {
             NationSavedData data, Random rng) {
         List<Nation> others = new ArrayList<>(data.getAllNations());
         others.remove(bot);
-        if (others.isEmpty()) return;
+        if (others.isEmpty())
+            return;
 
         Nation target = others.get(rng.nextInt(others.size()));
         RelationType current = bot.getRelationWith(target.getId());

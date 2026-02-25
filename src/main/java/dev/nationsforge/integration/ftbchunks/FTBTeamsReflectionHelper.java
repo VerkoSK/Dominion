@@ -14,6 +14,7 @@ final class FTBTeamsReflectionHelper {
 
     private static boolean failed = false;
     private static Method mFTBTeamsApi;
+    private static Method mGetManager;
     private static Method mGetTeamByName;
     private static Method mGetId;
 
@@ -30,9 +31,8 @@ final class FTBTeamsReflectionHelper {
         try {
             init();
             Object ftbApi = mFTBTeamsApi.invoke(null);
-            // getManagerForServer or getManager(server)
-            Object manager = ftbApi.getClass().getMethod("getManager", MinecraftServer.class)
-                    .invoke(ftbApi, server);
+            // getManager() with NO args — the old code wrongly passed MinecraftServer
+            Object manager = mGetManager.invoke(ftbApi);
             if (manager == null)
                 return null;
 
@@ -55,8 +55,12 @@ final class FTBTeamsReflectionHelper {
         Class<?> apiClass = Class.forName("dev.ftb.mods.ftbteams.api.FTBTeamsAPI");
         mFTBTeamsApi = apiClass.getMethod("api");
 
-        Class<?> managerClass = Class.forName("dev.ftb.mods.ftbteams.api.TeamManager");
-        mGetTeamByName = managerClass.getMethod("getTeamByName", String.class);
+        // Resolve getManager() on the actual API instance (no-arg version)
+        Object apiInstance = mFTBTeamsApi.invoke(null);
+        mGetManager = apiInstance.getClass().getMethod("getManager");
+        Object manager = mGetManager.invoke(apiInstance);
+
+        mGetTeamByName = manager.getClass().getMethod("getTeamByName", String.class);
 
         Class<?> teamClass = Class.forName("dev.ftb.mods.ftbteams.api.Team");
         mGetId = teamClass.getMethod("getId");

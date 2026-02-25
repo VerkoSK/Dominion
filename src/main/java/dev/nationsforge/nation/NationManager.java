@@ -418,23 +418,27 @@ public class NationManager {
     // ── Treasury ─────────────────────────────────────────────────────────────────
 
     /**
-     * Transfers Nation Coins from a player's inventory into their nation's treasury.
+     * Transfers Nation Coins from a player's inventory into their nation's
+     * treasury.
      * The player must be online. Returns SUCCESS even if they lack the coins — they
      * are notified in chat instead.
      */
     public static Result depositCoins(MinecraftServer server, UUID playerId, int amount) {
         NationSavedData data = getData(server);
         Optional<Nation> opt = data.getNationOfPlayer(playerId);
-        if (opt.isEmpty()) return Result.NOT_IN_NATION;
+        if (opt.isEmpty())
+            return Result.NOT_IN_NATION;
         Nation nation = opt.get();
 
         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-        if (player == null) return Result.NOT_IN_NATION;
+        if (player == null)
+            return Result.NOT_IN_NATION;
 
         // Count coins currently in inventory
         int held = 0;
         for (ItemStack s : player.getInventory().items) {
-            if (s.is(ModItems.NATION_COIN.get())) held += s.getCount();
+            if (s.is(ModItems.NATION_COIN.get()))
+                held += s.getCount();
         }
 
         if (held < amount) {
@@ -446,7 +450,8 @@ public class NationManager {
         // Consume coins
         int remaining = amount;
         for (ItemStack s : player.getInventory().items) {
-            if (remaining <= 0) break;
+            if (remaining <= 0)
+                break;
             if (s.is(ModItems.NATION_COIN.get())) {
                 int take = Math.min(remaining, s.getCount());
                 s.shrink(take);
@@ -470,10 +475,12 @@ public class NationManager {
     public static Result withdrawCoins(MinecraftServer server, UUID playerId, int amount) {
         NationSavedData data = getData(server);
         Optional<Nation> opt = data.getNationOfPlayer(playerId);
-        if (opt.isEmpty()) return Result.NOT_IN_NATION;
+        if (opt.isEmpty())
+            return Result.NOT_IN_NATION;
         Nation nation = opt.get();
 
-        if (!nation.getRank(playerId).canEditSettings()) return Result.NO_PERMISSION;
+        if (!nation.getRank(playerId).canEditSettings())
+            return Result.NO_PERMISSION;
 
         if (nation.getTreasury() < amount) {
             notifyPlayer(server, playerId,
@@ -482,7 +489,8 @@ public class NationManager {
         }
 
         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-        if (player == null) return Result.NOT_IN_NATION;
+        if (player == null)
+            return Result.NOT_IN_NATION;
 
         nation.addTreasury(-amount);
         data.setDirty();
