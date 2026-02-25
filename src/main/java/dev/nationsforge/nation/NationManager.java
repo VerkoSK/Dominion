@@ -5,9 +5,11 @@ import dev.nationsforge.event.NationDisbandedEvent;
 import dev.nationsforge.event.NationRelationChangedEvent;
 import dev.nationsforge.event.PlayerJoinedNationEvent;
 import dev.nationsforge.event.PlayerLeftNationEvent;
+import dev.nationsforge.bot.BotNationAI;
 import dev.nationsforge.integration.ftbteams.FTBTeamsHelper;
 import dev.nationsforge.item.ModItems;
 import dev.nationsforge.network.PacketHandler;
+import dev.nationsforge.network.packet.S2CDiplomacyNotifyPacket;
 import dev.nationsforge.network.packet.S2CNationsDataPacket;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraft.network.chat.Component;
@@ -46,7 +48,10 @@ public class NationManager {
         PLAYER_NOT_IN_NATION,
         ALREADY_AT_WAR,
         CANNOT_WAR_ALLY,
-        INVITE_NOT_FOUND;
+        INVITE_NOT_FOUND,
+        REQUEST_NOT_FOUND,
+        NOT_YOUR_REQUEST,
+        ALREADY_PENDING;
 
         public boolean ok() {
             return this == SUCCESS;
@@ -310,7 +315,139 @@ public class NationManager {
         return Result.SUCCESS;
     }
 
-    // ── Diplomacy ────────────────────────────────────────────────────────────────
+    // ── Diplomacy (request/response) ─────────────────────────────────────────────
+
+    /**
+     * Proposes a diplomatic relation change to another nation.
+     * If the target is a bot nation, the AI responds immediately.
+     * Otherwise a pending {@link DiplomacyRequest} is stored and the
+     * target nation's online members are notified via
+     * {@link S2CDiplomacyNotifyPacket}.
+     */
+    public static Result requestDiplomacy(MinecraftServer server, UUID requesterId,
+            UUID targetNationId, RelationType proposedType, String message) {
+        NationSavedData data = getData(server);
+        Optional<Nation> optA = data.getNationOfPlayer(requesterId);
+        if (optA.isEmpty()) return Result.NOT_IN_NATION;
+        Nation nationA = optA.get();
+        if (!nationA.getRank(requesterId).canManageDiplomacy()) return Result.NO_PERMISSION;
+        Optional<Nation> optB = data.getNationById(targetNationId);
+        if (optB.isEmpty()) return Result.NATION_NOT_FOUND;
+        Nation nationB = optB.get();
+        if (nationA.getId().equals(targetNationId)) return Result.CANNOT_SELF_TARGET;
+
+        // Prevent duplicate pending requests between the same pair
+        if (data.hasPendingRequestBetween(nationA.getId(), targetNationId))
+            return Result.ALREADY_PENDING;
+
+        DiplomacyRequest req = new DiplomacyRequest(
+                nationA.getId(), targetNationId, proposedType,
+                message == null ? "" : message);
+
+        if (nationB.isBot()) {
+            // Bot nations respond instantly via AI evaluation
+            boolean accept = BotNationAI.evaluateIncomingRequest(nationB, req, new java.util.Random());
+            if (accept) {
+                RelationType oldType = nationA.getRelationWith(targetNationId);
+                nationA.setRelation(targetNationId, proposedType, "Bot accepted");
+                nationB.setRelation(nationA.getId(), proposedType, "Bot accepted");
+                data.setDirty();
+                broadcastAll(server);
+                MinecraftForge.EVENT_BUS.post(new NationRelationChangedEvent(
+                        nationA, nationB, oldType, proposedType, server));
+                notifyNation(server, nationA, Component.literal(
+                        "§7[§aDiplomacy§7] §f" + nationB.getName()
+                        + "§7 accepted your proposal: §r"
+                        + coloured(proposedType.displayName, proposedType.colour & 0xFFFFFF) + "§7."));
+            } else {
+                notifyNation(server, nationA, Component.literal(
+                        "§7[§cDiplomacy§7] §f" + nationB.getName()
+                        + "§7 has declined your §r"
+                        + coloured(proposedType.displayName, proposedType.colour & 0xFFFFFF)
+                        + "§7 proposal."));
+            }
+            return Result.SUCCESS;
+        }
+
+        // Player nation: store request and notify target nation's members
+        data.addDiplomacyRequest(req);
+        notifyNation(server, nationA, Component.literal(
+                "§7[Diplomacy] Proposal sent to §f" + nationB.getName() + "§7."));
+        notifyNation(server, nationB, Component.literal(
+                "§7[§6Diplomacy§7] §f" + nationA.getName()
+                + "§7 proposes §r"
+                + coloured(proposedType.displayName, proposedType.colour & 0xFFFFFF)
+                + "§7. Open Diplomacy tab to respond."));
+        // Push updated pending list to both nations' online members
+        pushDiplomacyToNation(server, data, nationA);
+        pushDiplomacyToNation(server, data, nationB);
+        return Result.SUCCESS;
+    }
+
+    /**
+     * Accept or decline a pending diplomacy request.
+     * The responder must be in the TARGET nation and have diplomacy rank.
+     */
+    public static Result respondDiplomacy(MinecraftServer server, UUID responderId,
+            UUID requestId, boolean accepted, String responseMessage) {
+        NationSavedData data = getData(server);
+        Optional<Nation> optResponder = data.getNationOfPlayer(responderId);
+        if (optResponder.isEmpty()) return Result.NOT_IN_NATION;
+        Nation responderNation = optResponder.get();
+        if (!responderNation.getRank(responderId).canManageDiplomacy()) return Result.NO_PERMISSION;
+
+        Optional<DiplomacyRequest> optReq = data.getRequestById(requestId);
+        if (optReq.isEmpty()) return Result.REQUEST_NOT_FOUND;
+        DiplomacyRequest req = optReq.get();
+
+        // Ensure the responder is the target nation (not the proposer)
+        if (!req.getToNationId().equals(responderNation.getId())) return Result.NOT_YOUR_REQUEST;
+
+        Optional<Nation> optFrom = data.getNationById(req.getFromNationId());
+        if (optFrom.isEmpty()) {
+            data.removeDiplomacyRequest(requestId);
+            return Result.NATION_NOT_FOUND;
+        }
+        Nation fromNation = optFrom.get();
+
+        data.removeDiplomacyRequest(requestId);
+        req.setStatus(accepted ? DiplomacyRequest.Status.ACCEPTED : DiplomacyRequest.Status.DECLINED);
+
+        if (accepted) {
+            RelationType oldType = fromNation.getRelationWith(responderNation.getId());
+            RelationType newType = req.getProposedType();
+            fromNation.setRelation(responderNation.getId(), newType, "Diplomatic agreement");
+            responderNation.setRelation(fromNation.getId(), newType, "Diplomatic agreement");
+            data.setDirty();
+            broadcastAll(server);
+            MinecraftForge.EVENT_BUS.post(new NationRelationChangedEvent(
+                    fromNation, responderNation, oldType, newType, server));
+            notifyNation(server, fromNation, Component.literal(
+                    "§7[§aDiplomacy§7] §f" + responderNation.getName()
+                    + "§7 accepted: relation is now §r"
+                    + coloured(newType.displayName, newType.colour & 0xFFFFFF) + "§7."));
+            notifyNation(server, responderNation, Component.literal(
+                    "§7[§aDiplomacy§7] Agreement with §f" + fromNation.getName()
+                    + "§7: §r" + coloured(newType.displayName, newType.colour & 0xFFFFFF) + "§7."));
+        } else {
+            data.setDirty();
+            String rm = (responseMessage != null && !responseMessage.isBlank())
+                    ? " §7(\"" + responseMessage + "\")" : "";
+            notifyNation(server, fromNation, Component.literal(
+                    "§7[§cDiplomacy§7] §f" + responderNation.getName()
+                    + "§7 declined your §r"
+                    + coloured(req.getProposedType().displayName, req.getProposedType().colour & 0xFFFFFF)
+                    + "§7 proposal." + rm));
+            notifyNation(server, responderNation, Component.literal(
+                    "§7[Diplomacy] Proposal from §f" + fromNation.getName() + "§7 declined."));
+        }
+
+        pushDiplomacyToNation(server, data, fromNation);
+        pushDiplomacyToNation(server, data, responderNation);
+        return Result.SUCCESS;
+    }
+
+    // ── Diplomacy (instant — kept for bot-to-bot AI events) ──────────────────────
 
     public static Result setRelation(MinecraftServer server, UUID requesterId,
             UUID targetNationId, RelationType type,
@@ -510,6 +647,28 @@ public class NationManager {
         notifyPlayer(server, playerId, Component.literal(
                 "§aWithdrew §6" + amount + " §acoins from §f[" + nation.getTag() + "]§a."));
         return Result.SUCCESS;
+    }
+
+    /** Push the pending-request list for a nation to all its online members. */
+    public static void pushDiplomacyToNation(MinecraftServer server, NationSavedData data, Nation nation) {
+        List<DiplomacyRequest> list = data.getAllRequestsForNation(nation.getId());
+        S2CDiplomacyNotifyPacket pkt = new S2CDiplomacyNotifyPacket(list);
+        for (UUID uid : nation.getMembers().keySet()) {
+            ServerPlayer sp = server.getPlayerList().getPlayer(uid);
+            if (sp != null) PacketHandler.sendToPlayer(pkt, sp);
+        }
+    }
+
+    /** Push pending requests to a single player (used on login). */
+    public static void syncDiplomacyToPlayer(MinecraftServer server, ServerPlayer player) {
+        NationSavedData data = getData(server);
+        Optional<Nation> optNation = data.getNationOfPlayer(player.getUUID());
+        if (optNation.isEmpty()) {
+            PacketHandler.sendToPlayer(new S2CDiplomacyNotifyPacket(List.of()), player);
+            return;
+        }
+        List<DiplomacyRequest> list = data.getAllRequestsForNation(optNation.get().getId());
+        PacketHandler.sendToPlayer(new S2CDiplomacyNotifyPacket(list), player);
     }
 
     public static NationSavedData getData(MinecraftServer server) {

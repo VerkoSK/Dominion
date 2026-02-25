@@ -1,6 +1,7 @@
 package dev.nationsforge.bot;
 
 import dev.nationsforge.NationsForge;
+import dev.nationsforge.integration.ftbchunks.FTBChunksProxy;
 import dev.nationsforge.nation.Nation;
 import dev.nationsforge.nation.NationPowerCalculator;
 import dev.nationsforge.nation.NationSavedData;
@@ -147,13 +148,13 @@ public final class WorldBotGenerator {
                 int x = rng.nextInt(CAPITAL_RANGE * 2 + 1) - CAPITAL_RANGE;
                 int z = rng.nextInt(CAPITAL_RANGE * 2 + 1) - CAPITAL_RANGE;
                 if (isFarEnough(placed, x, z)) {
-                    chosen = new int[]{x, z};
+                    chosen = new int[] { x, z };
                     break;
                 }
             }
             if (chosen == null) {
                 // Fallback: just place it (very unlikely to be needed)
-                chosen = new int[]{
+                chosen = new int[] {
                         rng.nextInt(CAPITAL_RANGE * 2 + 1) - CAPITAL_RANGE,
                         rng.nextInt(CAPITAL_RANGE * 2 + 1) - CAPITAL_RANGE
                 };
@@ -173,12 +174,14 @@ public final class WorldBotGenerator {
         return true;
     }
 
-    // ── FTB integration ───────────────────────────────────────────────────────────
+    // ── FTB integration
+    // ───────────────────────────────────────────────────────────
 
     /**
      * For every bot nation:
      * 1. Creates the FTB Teams server team "dominion_TAG".
-     * 2. Runs {@code ftbchunks admin claim_as} to claim territory around the capital.
+     * 2. Runs {@code ftbchunks admin claim_as} to claim territory around the
+     * capital.
      *
      * Both operations are best-effort and logged. If FTB Teams / FTBChunks
      * is absent the commands simply fail silently.
@@ -189,19 +192,23 @@ public final class WorldBotGenerator {
             int capX = bot.getCapitalX();
             int capZ = bot.getCapitalZ();
 
-            // Create server team (idempotent)
+            // 1. Create FTB Teams server team via command (idempotent, calls syncToAll internally)
             runCmd(server, "ftbteams server create " + teamName);
 
-            // Claim territory around the capital.
-            // ftbchunks admin claim_as <team> [radius] [blockX] [blockZ]
-            // radius r claims a (2r+1)×(2r+1) square of chunks => radius 3 = 49 chunks
+            // 2. Claim territory via direct FTBChunks API (bypasses command-arg parsing issues)
             int territory = (int) bot.getTerritory();
             int radius = Math.max(1, (int) Math.round(Math.sqrt(territory) / 2.0));
-            runCmd(server, "ftbchunks admin claim_as " + teamName
-                    + " " + radius + " " + capX + " " + capZ);
 
-            NationsForge.LOGGER.debug("[Dominion] Bot '{}' team created, {} chunks claimed at ({}, {})",
-                    bot.getTag(), territory, capX, capZ);
+            if (FTBChunksProxy.isLoaded()) {
+                FTBChunksProxy.claimChunksForBotTeam(server, teamName, capX, capZ, radius);
+            } else {
+                // FTBChunks not installed — command fallback (no-op if mod absent)
+                runCmd(server, "ftbchunks admin claim_as " + teamName
+                        + " " + radius + " " + capX + " " + capZ);
+            }
+
+            NationsForge.LOGGER.debug("[Dominion] Bot '{}' team+chunks set up: {}×{} radius at ({},{})",
+                    bot.getTag(), territory, radius, capX, capZ);
         }
     }
 

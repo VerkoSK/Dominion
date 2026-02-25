@@ -6,43 +6,37 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.fml.ModList;
 
 import java.lang.reflect.Method;
+import java.util.UUID;
 
 /**
  * Soft-dependency integration with FTB Chunks.
  *
- * FTB Chunks lets players claim chunk ownership tied to their FTB Team.
- * Since Dominion links each nation to an FTB server team named
- * "dominion_TAG", chunks claimed by that team automatically belong to the
- * nation — no extra work required for the basic flow.
+ * FTBChunks has ONE global ClaimedChunkManager (not per-dimension).
+ * Chunks owned by the nation's FTB server team "dominion_TAG" are counted
+ * here and exposed to NationPowerCalculator.
  *
- * This helper counts those claimed chunks and exposes the count so the
- * NationPowerCalculator can factor territory into a nation's power score.
- *
- * Reflection strategy
- * ───────────────────
- * We never depend on FTB Chunks at compile time. Instead we try to call:
- * dev.ftb.mods.ftbchunks.api.FTBChunksAPI#api()
- * → FTBChunksAPIInstance#getManager(LevelAccessor)
- * → ClaimedChunkManager#getAllClaimedChunks()
- * → each ClaimedChunk#getTeamId() (UUID)
- *
- * We then cross-reference the FTB Teams team UUID for "dominion_TAG" to
- * count chunks. If any step fails (FTB Chunks not installed, API changed)
- * we silently return 0 and log a single WARN.
+ * Reflection chain (corrected):
+ *   FTBChunksAPI.api()                    → API instance
+ *   api.getManager()                      → ClaimedChunkManager (NO-ARG!)
+ *   manager.getAllClaimedChunks()          → Collection<ClaimedChunk>
+ *   chunk.getTeamData()                   → ChunkTeamData
+ *   teamData.getTeam()                    → Team
+ *   team.getId()                          → UUID  → compare to our team's UUID
  */
 public final class FTBChunksHelper {
 
     private static Boolean ftbChunksLoaded = null;
     private static boolean reflectionFailed = false;
 
-    // Cached reflection handles (loaded once on first use)
-    private static Method mApiGet;
-    private static Method mGetManager;
-    private static Method mGetAllClaimed;
-    private static Method mGetTeamId;
+    // FTBChunks reflection handles
+    private static Method mApiGet;         // FTBChunksAPI.api()
+    private static Method mGetManager;    // api.getManager()  — NO ARGS
+    private static Method mGetAllClaimed; // manager.getAllClaimedChunks()
+    private static Method mGetTeamData;   // chunk.getTeamData()
+    private static Method mGetTeam;       // teamData.getTeam()
+    private static Method mGetTeamId;     // team.getId()
 
-    private FTBChunksHelper() {
-    }
+    private FTBChunksHelper() {}
 
     // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -59,63 +53,73 @@ public final class FTBChunksHelper {
      * @return chunk count, or 0 if FTBChunks is absent or unavailable.
      */
     public static long countClaimedChunks(MinecraftServer server, Nation nation) {
-        if (!isLoaded() || reflectionFailed)
-            return 0;
+        if (!isLoaded() || reflectionFailed) return 0;
         try {
             return countViaReflection(server, nation);
         } catch (Exception e) {
             reflectionFailed = true;
-            NationsForge.LOGGER.warn("[Dominion/FTBChunks] Reflection failed (will not retry): {}", e.getMessage());
+            NationsForge.LOGGER.warn("[Dominion/FTBChunks] countClaimedChunks reflection failed (will not retry): {}", e.getMessage());
             return 0;
         }
     }
 
-    // ── Reflection
-    // ────────────────────────────────────────────────────────────────
+    // ── Reflection ───────────────────────────────────────────────────────────────
 
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     private static long countViaReflection(MinecraftServer server, Nation nation) throws Exception {
         initReflection();
 
-        // Resolve the FTB Teams team UUID for "dominion_<tag>"
-        // We get it via FTBTeams reflection as well
-        java.util.UUID teamId = FTBTeamsReflectionHelper.getServerTeamId(server,
+        // Look up the FTB Teams team UUID for "dominion_<tag>" via FTBTeams reflection
+        UUID teamId = FTBTeamsReflectionHelper.getServerTeamId(server,
                 "dominion_" + nation.getTag().toLowerCase());
-        if (teamId == null)
-            return 0;
+        if (teamId == null) return 0;
 
-        // Walk all loaded dimensions and sum claimed chunks for this team
+        // ONE global manager for all dimensions
+        Object api      = mApiGet.invoke(null);
+        Object manager  = mGetManager.invoke(api);       // no-arg getManager()
+        if (manager == null) return 0;
+
+        java.util.Collection<?> claimed = (java.util.Collection<?>) mGetAllClaimed.invoke(manager);
         long count = 0;
-        for (net.minecraft.server.level.ServerLevel level : server.getAllLevels()) {
-            Object api = mApiGet.invoke(null);
-            Object manager = mGetManager.invoke(api, level);
-            if (manager == null)
-                continue;
-            java.util.Collection<?> claimed = (java.util.Collection<?>) mGetAllClaimed.invoke(manager);
-            for (Object chunk : claimed) {
-                Object chunkTeamId = mGetTeamId.invoke(chunk);
-                if (teamId.equals(chunkTeamId))
-                    count++;
-            }
+        for (Object chunk : claimed) {
+            try {
+                Object teamData  = mGetTeamData.invoke(chunk);
+                if (teamData == null) continue;
+                Object team      = mGetTeam.invoke(teamData);
+                if (team == null) continue;
+                Object chunkTeamId = mGetTeamId.invoke(team);
+                if (teamId.equals(chunkTeamId)) count++;
+            } catch (Exception ignored) {}
         }
         return count;
     }
 
     private static void initReflection() throws Exception {
-        if (mApiGet != null)
-            return; // already initialised
+        if (mApiGet != null) return;   // already initialised
+
+        // FTBChunksAPI.api() → API instance
         Class<?> apiClass = Class.forName("dev.ftb.mods.ftbchunks.api.FTBChunksAPI");
         mApiGet = apiClass.getMethod("api");
+        Object apiInstance = mApiGet.invoke(null);
 
-        Class<?> instanceClass = Class.forName("dev.ftb.mods.ftbchunks.api.FTBChunksAPIInstance");
-        // getManager accepts a LevelAccessor (parent of ServerLevel)
-        Class<?> levelAccessor = Class.forName("net.minecraft.world.level.LevelAccessor");
-        mGetManager = instanceClass.getMethod("getManager", levelAccessor);
+        // api.getManager() — NO ARGUMENT (not per-level!)
+        mGetManager = apiInstance.getClass().getMethod("getManager");
+        Object manager = mGetManager.invoke(apiInstance);
 
-        Class<?> managerClass = Class.forName("dev.ftb.mods.ftbchunks.api.ClaimedChunkManager");
-        mGetAllClaimed = managerClass.getMethod("getAllClaimedChunks");
+        // manager.getAllClaimedChunks()
+        mGetAllClaimed = manager.getClass().getMethod("getAllClaimedChunks");
 
-        Class<?> chunkClass = Class.forName("dev.ftb.mods.ftbchunks.api.ClaimedChunk");
-        mGetTeamId = chunkClass.getMethod("getTeamId");
+        // chunk.getTeamData() → ChunkTeamData
+        Class<?> claimedChunkInterface = Class.forName("dev.ftb.mods.ftbchunks.api.ClaimedChunk");
+        mGetTeamData = claimedChunkInterface.getMethod("getTeamData");
+
+        // teamData.getTeam() → Team
+        Class<?> chunkTeamDataInterface = Class.forName("dev.ftb.mods.ftbchunks.api.ChunkTeamData");
+        mGetTeam = chunkTeamDataInterface.getMethod("getTeam");
+
+        // team.getId() → UUID
+        Class<?> teamInterface = Class.forName("dev.ftb.mods.ftbteams.api.Team");
+        mGetTeamId = teamInterface.getMethod("getId");
+
+        NationsForge.LOGGER.info("[Dominion/FTBChunks] FTBChunksHelper reflection initialised OK");
     }
 }

@@ -23,6 +23,8 @@ public class NationSavedData extends SavedData {
     private final Map<UUID, UUID> playerNation = new HashMap<>();
     /** Whether the world's bot nations have been generated yet. */
     private boolean worldBotGenerated = false;
+    /** Pending diplomacy requests, keyed by request UUID. */
+    private final Map<UUID, DiplomacyRequest> pendingRequests = new LinkedHashMap<>();
 
     // ── Factory ──────────────────────────────────────────────────────────────────
 
@@ -44,6 +46,12 @@ public class NationSavedData extends SavedData {
                 data.playerNation.put(player, n.getId());
             }
         }
+        // Load pending diplomacy requests
+        ListTag reqList = tag.getList("pendingRequests", Tag.TAG_COMPOUND);
+        for (int i = 0; i < reqList.size(); i++) {
+            DiplomacyRequest r = DiplomacyRequest.fromNBT(reqList.getCompound(i));
+            data.pendingRequests.put(r.getId(), r);
+        }
         return data;
     }
 
@@ -55,6 +63,12 @@ public class NationSavedData extends SavedData {
             list.add(n.toNBT());
         }
         tag.put("nations", list);
+        // Save pending diplomacy requests
+        ListTag reqList = new ListTag();
+        for (DiplomacyRequest r : pendingRequests.values()) {
+            reqList.add(r.toNBT());
+        }
+        tag.put("pendingRequests", reqList);
         return tag;
     }
 
@@ -181,6 +195,61 @@ public class NationSavedData extends SavedData {
 
     // ── World bot flag
     // ───────────────────────────────────────────────────────────────
+
+    // ── Diplomacy Requests ────────────────────────────────────────────────────────
+
+    public void addDiplomacyRequest(DiplomacyRequest request) {
+        pendingRequests.put(request.getId(), request);
+        setDirty();
+    }
+
+    public void removeDiplomacyRequest(UUID requestId) {
+        if (pendingRequests.remove(requestId) != null) {
+            setDirty();
+        }
+    }
+
+    public java.util.Optional<DiplomacyRequest> getRequestById(UUID requestId) {
+        return java.util.Optional.ofNullable(pendingRequests.get(requestId));
+    }
+
+    /**
+     * Returns all PENDING requests where the given nation is the TARGET (receiver).
+     */
+    public List<DiplomacyRequest> getIncomingRequestsForNation(UUID nationId) {
+        return pendingRequests.values().stream()
+                .filter(r -> r.getStatus() == DiplomacyRequest.Status.PENDING
+                        && r.getToNationId().equals(nationId))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns all PENDING requests where the given nation is the SENDER (proposer).
+     */
+    public List<DiplomacyRequest> getOutgoingRequestsForNation(UUID nationId) {
+        return pendingRequests.values().stream()
+                .filter(r -> r.getStatus() == DiplomacyRequest.Status.PENDING
+                        && r.getFromNationId().equals(nationId))
+                .collect(Collectors.toList());
+    }
+
+    /** Returns all pending requests related to a nation (incoming or outgoing). */
+    public List<DiplomacyRequest> getAllRequestsForNation(UUID nationId) {
+        return pendingRequests.values().stream()
+                .filter(r -> r.getStatus() == DiplomacyRequest.Status.PENDING
+                        && (r.getToNationId().equals(nationId)
+                                || r.getFromNationId().equals(nationId)))
+                .collect(Collectors.toList());
+    }
+
+    public boolean hasPendingRequestBetween(UUID nationA, UUID nationB) {
+        return pendingRequests.values().stream()
+                .anyMatch(r -> r.getStatus() == DiplomacyRequest.Status.PENDING
+                        && ((r.getFromNationId().equals(nationA) && r.getToNationId().equals(nationB))
+                         || (r.getFromNationId().equals(nationB) && r.getToNationId().equals(nationA))));
+    }
+
+    // ── World bot flag ────────────────────────────────────────────────────────────
 
     public boolean isWorldBotGenerated() {
         return worldBotGenerated;

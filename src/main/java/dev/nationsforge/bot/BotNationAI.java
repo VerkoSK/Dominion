@@ -1,6 +1,7 @@
 package dev.nationsforge.bot;
 
 import dev.nationsforge.NationsForge;
+import dev.nationsforge.nation.DiplomacyRequest;
 import dev.nationsforge.nation.Nation;
 import dev.nationsforge.nation.NationFlag;
 import dev.nationsforge.nation.NationPowerCalculator;
@@ -206,7 +207,87 @@ public final class BotNationAI {
                     PROSPERITY_MSGS[rng.nextInt(PROSPERITY_MSGS.length)], bot.getName()));
         }
     }
+    // ── Incoming request evaluation ──────────────────────────────────────────────
 
+    /**
+     * Evaluates a player-sent diplomacy request directed at a bot nation.
+     * Returns {@code true} if the bot accepts, {@code false} to decline.
+     *
+     * Decision logic:
+     * <ul>
+     *   <li>WAR status: only peace proposals considered (60 % base accept).</li>
+     *   <li>NEUTRAL: trade pacts accepted ~70 %, alliances ~40 %.</li>
+     *   <li>RIVALRY: peace at 50 %, alliance at 15 %.</li>
+     *   <li>ALLY: worsening proposals accepted at only 10 %.</li>
+     *   <li>AGGRESSIVE personality: +20 % reject; DIPLOMATIC: +20 % accept.</li>
+     * </ul>
+     */
+    public static boolean evaluateIncomingRequest(Nation bot, DiplomacyRequest req, Random rng) {
+        RelationType current = bot.getRelationWith(req.getFromNationId());
+        RelationType proposed = req.getProposedType();
+
+        // Personality modifier: parse from description suffix "...|PERSONALITY"
+        int personalityAcceptBonus = 0;
+        String desc = bot.getDescription();
+        if (desc != null) {
+            int pipe = desc.lastIndexOf('|');
+            if (pipe >= 0) {
+                String pStr = desc.substring(pipe + 1).trim();
+                if ("DIPLOMATIC".equalsIgnoreCase(pStr))  personalityAcceptBonus =  20;
+                if ("AGGRESSIVE".equalsIgnoreCase(pStr))  personalityAcceptBonus = -20;
+                if ("ISOLATIONIST".equalsIgnoreCase(pStr)) personalityAcceptBonus = -10;
+            }
+        }
+
+        int chance; // base accept chance out of 100
+        if (current == RelationType.WAR) {
+            // In war: only accept a return to neutral, refuse everything else
+            if (proposed == RelationType.NEUTRAL) {
+                chance = 60;
+            } else {
+                chance = 5;
+            }
+        } else if (current == RelationType.ALLIANCE) {
+            // Already allied: reject any demotion
+            if (proposed == RelationType.ALLIANCE || proposed == RelationType.TRADE_PACT) {
+                chance = 90; // redundant upgrade
+            } else {
+                chance = 10;
+            }
+        } else if (current == RelationType.TRADE_PACT) {
+            if (proposed == RelationType.ALLIANCE) {
+                chance = 55;
+            } else if (proposed == RelationType.TRADE_PACT) {
+                chance = 90;
+            } else {
+                chance = 20;
+            }
+        } else if (current == RelationType.RIVALRY) {
+            if (proposed == RelationType.NEUTRAL) {
+                chance = 50;
+            } else if (proposed == RelationType.ALLIANCE) {
+                chance = 15;
+            } else if (proposed == RelationType.TRADE_PACT) {
+                chance = 30;
+            } else {
+                chance = 10;
+            }
+        } else {
+            // NEUTRAL baseline
+            if (proposed == RelationType.TRADE_PACT) {
+                chance = 70;
+            } else if (proposed == RelationType.ALLIANCE) {
+                chance = 40;
+            } else if (proposed == RelationType.RIVALRY || proposed == RelationType.WAR) {
+                chance = 8;
+            } else {
+                chance = 60;
+            }
+        }
+
+        chance = Math.max(2, Math.min(98, chance + personalityAcceptBonus));
+        return rng.nextInt(100) < chance;
+    }
     // ── Utilities ────────────────────────────────────────────────────────────────
 
     /**

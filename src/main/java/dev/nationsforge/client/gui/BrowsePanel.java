@@ -18,7 +18,8 @@ import java.util.*;
 /**
  * Tab 3 — "Browse"
  * Shows all nations in the world. Players without a nation can join open ones.
- * The right panel shows the selected nation's flag, tier, full stats and relations.
+ * The right panel shows the selected nation's flag, tier, full stats and
+ * relations.
  */
 public class BrowsePanel extends NationPanel {
 
@@ -52,11 +53,14 @@ public class BrowsePanel extends NationPanel {
             ownWidgets.remove(btnJoin);
             btnJoin = null;
         }
-        if (selectedNation == null || ClientNationData.localPlayerHasNation()) return;
+        if (selectedNation == null || ClientNationData.localPlayerHasNation())
+            return;
         Nation n = ClientNationData.getNationById(selectedNation);
-        if (n == null) return;
+        if (n == null)
+            return;
         boolean canJoin = n.isOpenRecruitment() || n.hasInvite(ClientNationData.getLocalPlayerId());
-        if (!canJoin) return;
+        if (!canJoin)
+            return;
         btnJoin = add(Button.builder(Component.literal("§aJoin"),
                 b -> {
                     PacketHandler.sendToServer(new C2SJoinNationPacket(selectedNation));
@@ -98,12 +102,14 @@ public class BrowsePanel extends NationPanel {
         for (int i = 0; i < allNations.size(); i++) {
             Nation nation = allNations.get(i);
             int rowY = startY + i * ROW_H - scrollOffset;
-            if (rowY + ROW_H < startY || rowY > startY + h - 30) continue;
+            if (rowY + ROW_H < startY || rowY > startY + h - 30)
+                continue;
 
             boolean sel = nation.getId().equals(selectedNation);
             boolean isMyNation = nation.getId().equals(
                     ClientNationData.getLocalNation() != null
-                            ? ClientNationData.getLocalNation().getId() : null);
+                            ? ClientNationData.getLocalNation().getId()
+                            : null);
             boolean hasInvite = nation.hasInvite(myId);
             int rgb24 = nation.getColour() & 0xFFFFFF;
 
@@ -158,7 +164,8 @@ public class BrowsePanel extends NationPanel {
         // ── Right detail panel ────────────────────────────────────────────────────
         if (selectedNation != null) {
             Nation n = ClientNationData.getNationById(selectedNation);
-            if (n != null) renderDetailPanel(gfx, font, n);
+            if (n != null)
+                renderDetailPanel(gfx, font, n);
         }
     }
 
@@ -181,7 +188,8 @@ public class BrowsePanel extends NationPanel {
 
         // Nation name in header
         String headerName = n.getName().length() > 16
-                ? n.getName().substring(0, 14) + "…" : n.getName();
+                ? n.getName().substring(0, 14) + "…"
+                : n.getName();
         gfx.drawString(font, "§f§l" + headerName, rx + 4, ry + 5, 0xFF_FFFFFF, false);
 
         // ── Flag (32×32 = 2× scaled 16×16 item render) ───────────────────────────
@@ -242,10 +250,10 @@ public class BrowsePanel extends NationPanel {
         statsY += lineH;
 
         // ── Relations strip ───────────────────────────────────────────────────────
-        long wars    = n.getRelations().values().stream().filter(r -> r.getType() == RelationType.WAR).count();
-        long allies  = n.getRelations().values().stream().filter(r -> r.getType() == RelationType.ALLIANCE).count();
-        long trades  = n.getRelations().values().stream().filter(r -> r.getType() == RelationType.TRADE_PACT).count();
-        long rivals  = n.getRelations().values().stream().filter(r -> r.getType() == RelationType.RIVALRY).count();
+        long wars = n.getRelations().values().stream().filter(r -> r.getType() == RelationType.WAR).count();
+        long allies = n.getRelations().values().stream().filter(r -> r.getType() == RelationType.ALLIANCE).count();
+        long trades = n.getRelations().values().stream().filter(r -> r.getType() == RelationType.TRADE_PACT).count();
+        long rivals = n.getRelations().values().stream().filter(r -> r.getType() == RelationType.RIVALRY).count();
 
         statsY += 3;
         gfx.fill(rx + 4, statsY, rx + rw - 4, statsY + 1, NationGuiHelper.COL_BORDER);
@@ -280,7 +288,8 @@ public class BrowsePanel extends NationPanel {
                     gfx.drawString(font, "§7§o" + line.toString().trim(),
                             tx, statsY, NationGuiHelper.COL_TEXT_DIM, false);
                     statsY += 10;
-                    if (statsY > ry + rh - 20) break; // overflow guard
+                    if (statsY > ry + rh - 20)
+                        break; // overflow guard
                     line = new StringBuilder();
                 }
                 line.append(word).append(" ");
@@ -300,7 +309,8 @@ public class BrowsePanel extends NationPanel {
         int startY = y + 6;
         int listW = w - DETAIL_W - 6;
         List<Nation> invited = ClientNationData.getPendingInvites();
-        if (!invited.isEmpty()) startY += 20;
+        if (!invited.isEmpty())
+            startY += 20;
 
         for (int i = 0; i < allNations.size(); i++) {
             int rowY = startY + i * ROW_H - scrollOffset;

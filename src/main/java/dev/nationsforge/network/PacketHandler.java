@@ -84,6 +84,25 @@ public class PacketHandler {
                                 .encoder(C2SUpdateFlagPacket::encode)
                                 .consumerMainThread(C2SUpdateFlagPacket::handle)
                                 .add();
+
+                // Diplomacy negotiation packets
+                CHANNEL.messageBuilder(C2SDiplomacyRequestPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                                .decoder(C2SDiplomacyRequestPacket::decode)
+                                .encoder(C2SDiplomacyRequestPacket::encode)
+                                .consumerMainThread(C2SDiplomacyRequestPacket::handle)
+                                .add();
+
+                CHANNEL.messageBuilder(C2SDiplomacyResponsePacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                                .decoder(C2SDiplomacyResponsePacket::decode)
+                                .encoder(C2SDiplomacyResponsePacket::encode)
+                                .consumerMainThread(C2SDiplomacyResponsePacket::handle)
+                                .add();
+
+                CHANNEL.messageBuilder(S2CDiplomacyNotifyPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                                .decoder(S2CDiplomacyNotifyPacket::decode)
+                                .encoder(S2CDiplomacyNotifyPacket::encode)
+                                .consumerMainThread(S2CDiplomacyNotifyPacket::handle)
+                                .add();
         }
 
         public static void sendToPlayer(Object packet, ServerPlayer player) {

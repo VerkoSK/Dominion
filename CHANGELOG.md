@@ -6,9 +6,51 @@ Versioning follows **MAJOR.MINOR.PATCH** — patch bumps on every build.
 
 ---
 
+## [1.2.2] — 2026-02-25
+
+### Fixed
+
+- **FTBTeams syncToAll** — `addMember` / `removeMember` now call `markDirty()` +
+  `syncToAll(team)` via reflection, so every client is notified of membership
+  changes in real time (was missing in 1.2.1).
+- **FTBChunksHelper** — fixed `getManager()` call (was passing a `LevelAccessor`
+  arg that doesn't exist) and fixed chunk-team UUID lookup chain
+  (`chunk.getTeamData().getTeam().getId()` — `getTeamId()` never existed on
+  `ClaimedChunk`).
+- **Bot chunk claiming** — replaced fragile `ftbchunks admin claim_as` command
+  with a new `FTBChunksProxy` that uses the FTBChunks Java API directly.
+
+### Added
+
+- **Immersive diplomacy system**
+  - Proposing a relation change now creates a *pending request* instead of
+    applying instantly.  The target nation's online members receive a
+    notification and see the request in the Diplomacy tab.
+  - Bot nations respond instantly using `BotNationAI.evaluateIncomingRequest()`
+    with personality-aware probabilities (aggressive bots reject more, diplomatic
+    bots accept more).
+  - `DiplomacyRequest` data class persisted to `nationsforge_nations.dat` so
+    requests survive server restarts.
+  - Three new network packets: `C2SDiplomacyRequestPacket`,
+    `C2SDiplomacyResponsePacket`, `S2CDiplomacyNotifyPacket`.
+
+- **Redesigned Diplomacy panel**
+  - Two-column layout: nation list on the left, selected-nation info + propose
+    controls on the right.
+  - Optional message field for every proposal (max 256 chars).
+  - "Incoming Requests" strip at the bottom shows pending requests with
+    **Accept** / **Decline** buttons.
+  - Outgoing awaiting-response indicator shown in the right panel.
+
+- **Full-screen UI** — `NationsScreen` now scales to up to 820 × 500 pixels,
+  dynamically capped to `screenW − 40` × `screenH − 40`.
+
+---
+
 ## [1.2.1] — 2026-02-26
 
 ### Fixed
+
 - **FTB Teams integration** — team member add/remove now uses Java reflection
   (`AbstractTeam.addMember` / `removeMember`) instead of non-existent console
   commands, so players are correctly added to/removed from their nation's team.
@@ -16,6 +58,7 @@ Versioning follows **MAJOR.MINOR.PATCH** — patch bumps on every build.
   correct no-arg `getManager()`, resolving server-team UUID lookups for FTBChunks.
 
 ### Added
+
 - **Bot nation capitals** — each bot nation now stores `capitalX`/`capitalZ`
   coordinates (persisted in NBT). Capitals are spread across ±4000 blocks with
   a minimum 400-block spacing between any two nations.

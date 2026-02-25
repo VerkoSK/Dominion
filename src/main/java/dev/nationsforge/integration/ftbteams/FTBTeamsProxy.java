@@ -5,6 +5,8 @@ import dev.nationsforge.nation.Nation;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,27 +15,39 @@ import java.util.UUID;
  * FTB Teams integration.
  *
  * Each nation gets a server-managed FTB Teams team named "dominion_TAG".
- * Team creation/deletion uses FTB Teams commands (which support server teams).
- * Member add/remove uses Java reflection because FTB Teams has NO commands
- * for managing server team membership — only the Java API supports it.
+ * Team creation/deletion uses FTB Teams commands (which support server teams
+ * and internally call syncToAll). Member add/remove uses Java reflection
+ * because FTB Teams has NO commands for server-team membership management.
  *
- * Reflection cache is initialised lazily on first use and fails-safe
- * (falls back to no-op) if FTB Teams is absent or the API changes.
+ * CRITICAL: After calling addMember/removeMember via reflection we MUST call
+ * team.markDirty() and manager.syncToAll(team) otherwise clients never learn
+ * about the membership change and FTBChunks ignores the player as a member.
+ *
+ * We reach TeamManagerImpl via its public static INSTANCE field which is
+ * simpler and more reliable than going through FTBTeamsAPI.api().getManager().
  */
 final class FTBTeamsProxy {
 
-    private FTBTeamsProxy() {
-    }
+    private FTBTeamsProxy() {}
 
     // ── Reflection state ─────────────────────────────────────────────────────────
 
     private static boolean reflectionFailed = false;
-    private static Method mFtbApi;
-    private static Method mGetManager;
-    private static Method mGetTeamByName;
+
+    // TeamManagerImpl.INSTANCE field
+    private static Field  fTMInstance;
+
+    // Methods looked up lazily on first use
+    private static Method mGetTeamByName;  // TeamManagerImpl.getTeamByName(String) → Optional<Team>
+    private static Method mAddMember;      // AbstractTeamBase.addMember(UUID, TeamRank)
+    private static Method mRemoveMember;   // AbstractTeamBase.removeMember(UUID)
+    private static Method mMarkDirty;      // AbstractTeam.markDirty()
+    private static Method mSyncToAll;      // TeamManagerImpl.syncToAll(Team...)
+
     @SuppressWarnings("rawtypes")
     private static Class<Enum> teamRankClass;
-    private static Object rankMember;
+    private static Class<?>    teamInterface;
+    private static Object      rankMember;
 
     // ── Name helper ──────────────────────────────────────────────────────────────
 
@@ -45,48 +59,34 @@ final class FTBTeamsProxy {
     // ── Public operations ────────────────────────────────────────────────────────
 
     /**
-     * Creates the FTB server team for a newly founded nation.
-     * Idempotent — FTB Teams ignores the call if the team already exists.
+     * Creates the FTB server team for a newly founded (player or bot) nation.
+     * Uses "ftbteams server create <name>" which internally calls syncToAll.
      */
     static void createNationTeam(MinecraftServer server, Nation nation) {
-        String name = ftbTeamName(nation.getTag());
-        if (!runCmd(server, "ftbteams server create " + name)) {
-            runCmd(server, "ftbteams server create_team " + name);
-        }
+        runCmd(server, "ftbteams server create " + ftbTeamName(nation.getTag()));
     }
 
     /**
-     * Ensures the FTB team exists and adds the player to it.
-     * Uses Java reflection (addMember) because no command exists for this.
+     * Ensures the FTB team exists and adds the player to it as a MEMBER.
+     * After mutating the team we call markDirty() + syncToAll() so that
+     * all clients (and FTBChunks) receive the updated membership.
      */
     static void addPlayerToTeam(MinecraftServer server, String playerName, Nation nation) {
-        // Ensure the server team exists first
-        createNationTeam(server, nation);
-        String teamName = ftbTeamName(nation.getTag());
-
-        // Resolve player UUID from name
+        createNationTeam(server, nation);   // idempotent – no-op if already present
         UUID playerId = resolveUUID(server, playerName);
         if (playerId != null) {
-            if (addMemberReflect(server, teamName, playerId)) return;
-        }
-        // Fallback: attempt commands (works on some FTB Teams builds)
-        if (!runCmd(server, "ftbteams server join " + teamName + " " + playerName)) {
-            runCmd(server, "ftbteams server join_player " + teamName + " " + playerName);
+            addMemberReflect(server, ftbTeamName(nation.getTag()), playerId);
         }
     }
 
     /**
      * Removes a player from their former nation's FTB team.
-     * Uses Java reflection (removeMember) because no command exists for this.
+     * Also calls markDirty() + syncToAll() after mutation.
      */
     static void removePlayerFromTeam(MinecraftServer server, String playerName, String nationTag) {
-        String teamName = ftbTeamName(nationTag);
         UUID playerId = resolveUUID(server, playerName);
         if (playerId != null) {
-            if (removeMemberReflect(server, teamName, playerId)) return;
-        }
-        if (!runCmd(server, "ftbteams server kick " + teamName + " " + playerName)) {
-            runCmd(server, "ftbteams server kick_player " + teamName + " " + playerName);
+            removeMemberReflect(server, ftbTeamName(nationTag), playerId);
         }
     }
 
@@ -94,103 +94,114 @@ final class FTBTeamsProxy {
      * Deletes the FTB server team when a nation is disbanded.
      */
     static void deleteNationTeam(MinecraftServer server, String nationTag) {
-        String teamName = ftbTeamName(nationTag);
-        if (!runCmd(server, "ftbteams server delete " + teamName)) {
-            runCmd(server, "ftbteams server delete_team " + teamName);
+        runCmd(server, "ftbteams server delete " + ftbTeamName(nationTag));
+    }
+
+    // ── Reflection helpers ───────────────────────────────────────────────────────
+
+    private static void addMemberReflect(MinecraftServer server, String teamName, UUID playerId) {
+        try {
+            Object team = getTeamByName(teamName);
+            if (team == null) return;
+            ensureRankAndMethods(team);
+            mAddMember.invoke(team, playerId, rankMember);
+            mMarkDirty.invoke(team);
+            syncToAll(team);
+            NationsForge.LOGGER.debug("[Dominion/FTBTeams] addMember({}, {}) + syncToAll ok", teamName, playerId);
+        } catch (Exception e) {
+            NationsForge.LOGGER.warn("[Dominion/FTBTeams] addMemberReflect failed for {}: {}", teamName, e.getMessage());
         }
     }
 
-    // ── Reflection helpers ────────────────────────────────────────────────────────
-
-    private static boolean addMemberReflect(MinecraftServer server, String teamName, UUID playerId) {
+    private static void removeMemberReflect(MinecraftServer server, String teamName, UUID playerId) {
         try {
-            Object team = getTeamByName(server, teamName);
-            if (team == null) return false;
-            ensureTeamRank();
-            Method m = findMethod(team.getClass(), "addMember", UUID.class, teamRankClass);
-            if (m == null) return false;
-            m.setAccessible(true);
-            m.invoke(team, playerId, rankMember);
-            NationsForge.LOGGER.debug("[Dominion/FTBTeams] addMember({}, {}) ok", teamName, playerId);
-            return true;
+            Object team = getTeamByName(teamName);
+            if (team == null) return;
+            ensureRankAndMethods(team);
+            mRemoveMember.invoke(team, playerId);
+            mMarkDirty.invoke(team);
+            syncToAll(team);
+            NationsForge.LOGGER.debug("[Dominion/FTBTeams] removeMember({}, {}) + syncToAll ok", teamName, playerId);
         } catch (Exception e) {
-            NationsForge.LOGGER.debug("[Dominion/FTBTeams] addMemberReflect failed: {}", e.getMessage());
-            return false;
+            NationsForge.LOGGER.warn("[Dominion/FTBTeams] removeMemberReflect failed for {}: {}", teamName, e.getMessage());
         }
     }
 
-    private static boolean removeMemberReflect(MinecraftServer server, String teamName, UUID playerId) {
-        try {
-            Object team = getTeamByName(server, teamName);
-            if (team == null) return false;
-            Method m = findMethod(team.getClass(), "removeMember", UUID.class);
-            if (m == null) return false;
-            m.setAccessible(true);
-            m.invoke(team, playerId);
-            NationsForge.LOGGER.debug("[Dominion/FTBTeams] removeMember({}, {}) ok", teamName, playerId);
-            return true;
-        } catch (Exception e) {
-            NationsForge.LOGGER.debug("[Dominion/FTBTeams] removeMemberReflect failed: {}", e.getMessage());
-            return false;
+    /** Returns the live TeamManagerImpl.INSTANCE (re-fetched every call — safe across server restarts). */
+    private static Object getManagerInstance() throws Exception {
+        if (reflectionFailed) return null;
+        if (fTMInstance == null) {
+            try {
+                Class<?> tmClass = Class.forName("dev.ftb.mods.ftbteams.data.TeamManagerImpl");
+                fTMInstance = tmClass.getField("INSTANCE");  // public static field
+                mGetTeamByName = tmClass.getMethod("getTeamByName", String.class);
+                mSyncToAll = tmClass.getMethod("syncToAll",
+                        Array.newInstance(Class.forName("dev.ftb.mods.ftbteams.api.Team"), 0).getClass());
+            } catch (Exception e) {
+                reflectionFailed = true;
+                NationsForge.LOGGER.warn("[Dominion/FTBTeams] Reflection init failed: {}", e.getMessage());
+                throw e;
+            }
         }
+        return fTMInstance.get(null);   // fresh read every time
     }
 
     @SuppressWarnings("unchecked")
-    private static Object getTeamByName(MinecraftServer server, String teamName) throws Exception {
-        if (reflectionFailed) return null;
-        initReflection(server);
-        Object api = mFtbApi.invoke(null);
-        Object manager = mGetManager.invoke(api);
+    private static Object getTeamByName(String teamName) throws Exception {
+        Object manager = getManagerInstance();
         if (manager == null) return null;
         Optional<?> opt = (Optional<?>) mGetTeamByName.invoke(manager, teamName);
         return (opt != null && opt.isPresent()) ? opt.get() : null;
     }
 
-    private static void initReflection(MinecraftServer server) throws Exception {
-        if (mFtbApi != null) return;
-        try {
-            Class<?> apiClass = Class.forName("dev.ftb.mods.ftbteams.api.FTBTeamsAPI");
-            mFtbApi = apiClass.getMethod("api");
-            Object api = mFtbApi.invoke(null);
-            // getManager() with no args — NOT getManager(MinecraftServer)!
-            mGetManager = api.getClass().getMethod("getManager");
-            Object manager = mGetManager.invoke(api);
-            mGetTeamByName = manager.getClass().getMethod("getTeamByName", String.class);
-        } catch (Exception e) {
-            reflectionFailed = true;
-            throw e;
-        }
+    /** Sync the given team to all connected players (required after any member mutation). */
+    private static void syncToAll(Object team) throws Exception {
+        Object manager = getManagerInstance();
+        if (manager == null || mSyncToAll == null) return;
+        // syncToAll(Team... teams) — varargs == Team[]
+        if (teamInterface == null)
+            teamInterface = Class.forName("dev.ftb.mods.ftbteams.api.Team");
+        Object arr = Array.newInstance(teamInterface, 1);
+        Array.set(arr, 0, team);
+        mSyncToAll.invoke(manager, arr);
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void ensureTeamRank() throws Exception {
-        if (teamRankClass != null) return;
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private static void ensureRankAndMethods(Object team) throws Exception {
+        if (mAddMember != null) return;   // already initialised
+        // TeamRank enum
         teamRankClass = (Class<Enum>) Class.forName("dev.ftb.mods.ftbteams.api.TeamRank");
         rankMember = Enum.valueOf(teamRankClass, "MEMBER");
+        // addMember / removeMember — declared on AbstractTeamBase (public)
+        mAddMember    = findMethod(team.getClass(), "addMember",    UUID.class, teamRankClass);
+        mRemoveMember = findMethod(team.getClass(), "removeMember", UUID.class);
+        // markDirty — declared on AbstractTeam (public)
+        mMarkDirty    = findMethod(team.getClass(), "markDirty");
+        if (mAddMember != null)    mAddMember.setAccessible(true);
+        if (mRemoveMember != null) mRemoveMember.setAccessible(true);
+        if (mMarkDirty != null)    mMarkDirty.setAccessible(true);
     }
 
     /** Walk the class hierarchy to find the first matching declared method. */
     private static Method findMethod(Class<?> clazz, String name, Class<?>... params) {
         for (Class<?> c = clazz; c != null && c != Object.class; c = c.getSuperclass()) {
-            try {
-                return c.getDeclaredMethod(name, params);
-            } catch (NoSuchMethodException ignored) {
-            }
+            try { return c.getDeclaredMethod(name, params); }
+            catch (NoSuchMethodException ignored) {}
         }
         return null;
     }
 
     private static UUID resolveUUID(MinecraftServer server, String playerName) {
         try {
-            Optional<com.mojang.authlib.GameProfile> profile =
-                    server.getProfileCache().get(playerName);
+            Optional<com.mojang.authlib.GameProfile> profile = server.getProfileCache().get(playerName);
             return profile.map(com.mojang.authlib.GameProfile::getId).orElse(null);
         } catch (Exception e) {
             return null;
         }
     }
 
-    // ── Command runner ────────────────────────────────────────────────────────────
+    // ── Command runner
+    // ────────────────────────────────────────────────────────────
 
     private static boolean runCmd(MinecraftServer server, String command) {
         try {

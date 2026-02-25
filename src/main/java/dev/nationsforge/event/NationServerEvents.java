@@ -29,6 +29,8 @@ public class NationServerEvents {
         if (!(event.getEntity() instanceof ServerPlayer sp))
             return;
         NationManager.syncToPlayer(sp.getServer(), sp);
+        // Also send any pending diplomacy requests for their nation
+        NationManager.syncDiplomacyToPlayer(sp.getServer(), sp);
     }
 
     /** When a player respawns (dimension change), re-sync their data. */

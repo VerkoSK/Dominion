@@ -1,5 +1,6 @@
 package dev.nationsforge.client;
 
+import dev.nationsforge.nation.DiplomacyRequest;
 import dev.nationsforge.nation.Nation;
 import dev.nationsforge.nation.NationRank;
 import dev.nationsforge.nation.RelationType;
@@ -19,6 +20,8 @@ public class ClientNationData {
 
     private static final Map<UUID, Nation> nations = new LinkedHashMap<>();
     private static final Map<UUID, UUID> playerNationMap = new HashMap<>();
+    /** Pending diplomacy requests for the local player's nation (server-pushed). */
+    private static final List<DiplomacyRequest> pendingRequests = new ArrayList<>();
     /** UUID of the local player (set on world join). */
     private static UUID localPlayerId = null;
 
@@ -120,5 +123,40 @@ public class ClientNationData {
         List<Nation> list = new ArrayList<>(nations.values());
         list.sort(Comparator.comparingLong(Nation::getScore).reversed());
         return list;
+    }
+
+    // ── Diplomacy requests ───────────────────────────────────────────────────────
+
+    /** Called from {@link dev.nationsforge.network.packet.S2CDiplomacyNotifyPacket}. */
+    public static void setPendingRequests(List<DiplomacyRequest> requests) {
+        pendingRequests.clear();
+        pendingRequests.addAll(requests);
+    }
+
+    /** All pending requests for the local nation (incoming AND outgoing). */
+    public static List<DiplomacyRequest> getPendingRequests() {
+        return Collections.unmodifiableList(pendingRequests);
+    }
+
+    /** Only requests where the local nation is the TARGET (must respond). */
+    public static List<DiplomacyRequest> getIncomingRequests() {
+        Nation local = getLocalNation();
+        if (local == null) return List.of();
+        UUID id = local.getId();
+        return pendingRequests.stream()
+                .filter(r -> r.getStatus() == DiplomacyRequest.Status.PENDING
+                        && r.getToNationId().equals(id))
+                .toList();
+    }
+
+    /** Only requests where the local nation is the PROPOSER (waiting on answer). */
+    public static List<DiplomacyRequest> getOutgoingRequests() {
+        Nation local = getLocalNation();
+        if (local == null) return List.of();
+        UUID id = local.getId();
+        return pendingRequests.stream()
+                .filter(r -> r.getStatus() == DiplomacyRequest.Status.PENDING
+                        && r.getFromNationId().equals(id))
+                .toList();
     }
 }

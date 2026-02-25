@@ -27,12 +27,11 @@ import java.util.List;
 public class NationsScreen extends Screen {
 
     // Layout constants
-    private static final int GUI_W = 360;
-    private static final int GUI_H = 260;
     private static final int TAB_H = 20;
     private static final int TABS = 5; // Overview, Members, Diplomacy, Browse, Settings
 
-    private int left, top; // top-left corner of the GUI
+    private int guiW, guiH;      // computed from screen size in init()
+    private int left, top;       // top-left corner of the GUI
 
     private int activeTab = 0;
     private final List<Button> tabButtons = new ArrayList<>();
@@ -50,8 +49,10 @@ public class NationsScreen extends Screen {
 
     @Override
     protected void init() {
-        left = (width - GUI_W) / 2;
-        top = (height - GUI_H) / 2;
+        guiW = Math.min(820, Math.max(360, width  - 40));
+        guiH = Math.min(500, Math.max(260, height - 40));
+        left = (width  - guiW) / 2;
+        top  = (height - guiH) / 2;
 
         // Store local player ID so ClientNationData lookups work
         if (minecraft != null && minecraft.player != null) {
@@ -67,7 +68,7 @@ public class NationsScreen extends Screen {
         tabButtons.clear();
 
         String[] tabLabels = { "Overview", "Members", "Diplomacy", "Browse", "Settings" };
-        int tabW = GUI_W / TABS;
+        int tabW = guiW / TABS;
         for (int i = 0; i < TABS; i++) {
             final int idx = i;
             Button btn = Button.builder(Component.literal(tabLabels[i]),
@@ -79,13 +80,13 @@ public class NationsScreen extends Screen {
         }
 
         int panelY = top + 20 + TAB_H;
-        int panelH = GUI_H - 20 - TAB_H;
+        int panelH = guiH - 20 - TAB_H;
 
-        overviewPanel = new OverviewPanel(this, left, panelY, GUI_W, panelH);
-        membersPanel = new MembersPanel(this, left, panelY, GUI_W, panelH);
-        diplomacyPanel = new DiplomacyPanel(this, left, panelY, GUI_W, panelH);
-        browsePanel = new BrowsePanel(this, left, panelY, GUI_W, panelH);
-        settingsPanel = new SettingsPanel(this, left, panelY, GUI_W, panelH);
+        overviewPanel  = new OverviewPanel(this, left, panelY, guiW, panelH);
+        membersPanel   = new MembersPanel(this, left, panelY, guiW, panelH);
+        diplomacyPanel = new DiplomacyPanel(this, left, panelY, guiW, panelH);
+        browsePanel    = new BrowsePanel(this, left, panelY, guiW, panelH);
+        settingsPanel  = new SettingsPanel(this, left, panelY, guiW, panelH);
 
         activePanel().addWidgets();
     }
@@ -126,17 +127,17 @@ public class NationsScreen extends Screen {
         renderBackground(gfx);
 
         // Outer panel
-        NationGuiHelper.drawPanel(gfx, left, top, GUI_W, GUI_H,
+        NationGuiHelper.drawPanel(gfx, left, top, guiW, guiH,
                 NationGuiHelper.COL_BG, NationGuiHelper.COL_BORDER);
 
         // Top title bar
-        NationGuiHelper.drawHeader(gfx, font, "✦  Dominion", left, top, GUI_W, 20);
+        NationGuiHelper.drawHeader(gfx, font, "✦  Dominion", left, top, guiW, 20);
 
         // Tab strip background
-        gfx.fill(left, top + 20, left + GUI_W, top + 20 + TAB_H, NationGuiHelper.COL_TAB);
+        gfx.fill(left, top + 20, left + guiW, top + 20 + TAB_H, NationGuiHelper.COL_TAB);
 
         // Highlight active tab
-        int tabW = GUI_W / TABS;
+        int tabW = guiW / TABS;
         gfx.fill(left + activeTab * tabW, top + 20,
                 left + (activeTab + 1) * tabW, top + 20 + TAB_H,
                 NationGuiHelper.COL_TAB_ACTIVE);
@@ -195,7 +196,11 @@ public class NationsScreen extends Screen {
     }
 
     public int getGuiW() {
-        return GUI_W;
+        return guiW;
+    }
+
+    public int getGuiH() {
+        return guiH;
     }
 
     public int getTabH() {

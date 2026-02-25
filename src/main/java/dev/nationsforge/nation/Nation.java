@@ -259,9 +259,18 @@ public class Nation {
         this.bot = bot;
     }
 
-    public int getCapitalX() { return capitalX; }
-    public int getCapitalZ() { return capitalZ; }
-    public void setCapital(int x, int z) { this.capitalX = x; this.capitalZ = z; }
+    public int getCapitalX() {
+        return capitalX;
+    }
+
+    public int getCapitalZ() {
+        return capitalZ;
+    }
+
+    public void setCapital(int x, int z) {
+        this.capitalX = x;
+        this.capitalZ = z;
+    }
 
     // ── NBT serialisation ────────────────────────────────────────────────────────
 
