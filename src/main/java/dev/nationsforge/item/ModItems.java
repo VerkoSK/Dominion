@@ -2,6 +2,7 @@ package dev.nationsforge.item;
 
 import dev.nationsforge.NationsForge;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Rarity;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
@@ -17,5 +18,5 @@ public class ModItems {
 
     /** The national currency — crafted from gold, deposited into the treasury. */
     public static final RegistryObject<Item> NATION_COIN = ITEMS.register("nation_coin",
-            () -> new NationCoinItem(new Item.Properties().stacksTo(64)));
+            () -> new NationCoinItem(new Item.Properties().stacksTo(64).rarity(Rarity.UNCOMMON)));
 }

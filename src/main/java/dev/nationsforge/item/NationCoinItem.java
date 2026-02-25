@@ -3,6 +3,7 @@ package dev.nationsforge.item;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 
@@ -30,10 +31,12 @@ public class NationCoinItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level,
             List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.literal("§6National currency of the Dominion economy."));
-        tooltip.add(Component.literal("§8───────────────────────────────"));
-        tooltip.add(Component.literal("§7Craft: §e1 Gold Ingot §7→ §69 Coins"));
-        tooltip.add(Component.literal("§7Deposit: §e/nation deposit <amount>"));
-        tooltip.add(Component.literal("§7Withdraw: §e/nation withdraw <amount>"));
+        tooltip.add(Component.literal("§6A heavy gold coin bearing a crown seal."));
+        tooltip.add(Component.literal("§7Minted and circulated by the great nations."));
+        tooltip.add(Component.literal("§8──────────────────────────────────"));
+        tooltip.add(Component.literal("§eMint:     §71 Gold Ingot §8→ §69 Coins"));
+        tooltip.add(Component.literal("§eMelt:     §79 Coins §8→ §61 Gold Ingot"));
+        tooltip.add(Component.literal("§eDeposit:  §7/nation deposit <amount>"));
+        tooltip.add(Component.literal("§eWithdraw: §7/nation withdraw <amount>"));
     }
 }

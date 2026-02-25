@@ -6,6 +6,18 @@ Versioning follows **MAJOR.MINOR.PATCH** — patch bumps on every build.
 
 ---
 
+## [1.2.3] — 2026-02-25
+
+### Changed
+
+- **Nation Coin — custom texture & rarity** — the coin is no longer a recoloured
+  gold nugget; it now uses a hand-crafted 16×16 RGBA sprite: a circular gold coin
+  with a crown seal, directional shading and an engraved inner ring.
+  Item rarity bumped to **Uncommon** (gold name in inventory).
+  Tooltip updated to reflect minting / melting semantics.
+
+---
+
 ## [1.2.2] — 2026-02-25
 
 ### Fixed
