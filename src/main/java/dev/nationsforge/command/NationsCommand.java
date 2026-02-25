@@ -313,7 +313,49 @@ public class NationsCommand {
                                                                         "§aSynced nation data to all players."),
                                                                         true);
                                                         return 1;
-                                                })));
+                                                }))
+
+                                // ── Economy ──────────────────────────────────────────────────────────
+                                .then(Commands.literal("deposit")
+                                                .then(Commands.argument("amount",
+                                                                IntegerArgumentType.integer(1))
+                                                                .executes(ctx -> {
+                                                                        int amount = IntegerArgumentType
+                                                                                        .getInteger(ctx, "amount");
+                                                                        try {
+                                                                                ServerPlayer player = ctx.getSource()
+                                                                                                .getPlayerOrException();
+                                                                                NationManager.depositCoins(
+                                                                                                ctx.getSource().getServer(),
+                                                                                                player.getUUID(), amount);
+                                                                        } catch (Exception e) {
+                                                                                ctx.getSource().sendFailure(
+                                                                                                Component.literal("§cMust be run as a player."));
+                                                                        }
+                                                                        return 1;
+                                                                })))
+
+                                .then(Commands.literal("withdraw")
+                                                .then(Commands.argument("amount",
+                                                                IntegerArgumentType.integer(1))
+                                                                .executes(ctx -> {
+                                                                        int amount = IntegerArgumentType
+                                                                                        .getInteger(ctx, "amount");
+                                                                        try {
+                                                                                ServerPlayer player = ctx.getSource()
+                                                                                                .getPlayerOrException();
+                                                                                var r = NationManager.withdrawCoins(
+                                                                                                ctx.getSource().getServer(),
+                                                                                                player.getUUID(), amount);
+                                                                                if (!r.ok())
+                                                                                        ctx.getSource().sendFailure(
+                                                                                                        Component.literal("§c" + r.name()));
+                                                                        } catch (Exception e) {
+                                                                                ctx.getSource().sendFailure(
+                                                                                                Component.literal("§cMust be run as a player."));
+                                                                        }
+                                                                        return 1;
+                                                                }))));
         }
 
         private static int listNations(CommandSourceStack source) {

@@ -1,6 +1,7 @@
 package dev.nationsforge;
 
 import dev.nationsforge.client.NationKeybinds;
+import dev.nationsforge.item.ModItems;
 import dev.nationsforge.network.PacketHandler;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.common.MinecraftForge;
@@ -20,6 +21,9 @@ public class NationsForge {
 
     public NationsForge() {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
+
+        // Register items
+        ModItems.ITEMS.register(modBus);
 
         // Register network packets on the mod event bus (happens early enough)
         modBus.addListener(this::onCommonSetup);

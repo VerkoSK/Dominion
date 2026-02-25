@@ -35,10 +35,10 @@ public class C2SUpdateFlagPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ServerPlayer player = ctx.get().getSender();
-        if (player == null) return;
+        if (player == null)
+            return;
         NationFlag flag = NationFlag.fromNBT(flagNbt != null ? flagNbt : new CompoundTag());
-        ctx.get().enqueueWork(() ->
-                NationManager.updateFlag(player.getServer(), player.getUUID(), flag));
+        ctx.get().enqueueWork(() -> NationManager.updateFlag(player.getServer(), player.getUUID(), flag));
         ctx.get().setPacketHandled(true);
     }
 }

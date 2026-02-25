@@ -40,41 +40,62 @@ final class FTBTeamsProxy {
      * Idempotent — FTB Teams silently ignores the call if the team already exists.
      */
     static void createNationTeam(MinecraftServer server, Nation nation) {
-        runCmd(server, "ftbteams server create_team " + ftbTeamName(nation.getTag()));
+        String name = ftbTeamName(nation.getTag());
+        // Try both known FTB Teams command syntaxes (version differences)
+        if (!runCmd(server, "ftbteams server create " + name)) {
+            runCmd(server, "ftbteams server create_team " + name);
+        }
     }
 
     /**
      * Ensures the FTB team exists and adds the player to it.
      */
     static void addPlayerToTeam(MinecraftServer server, String playerName, Nation nation) {
-        // Ensure team exists first (create_team is idempotent)
-        runCmd(server, "ftbteams server create_team " + ftbTeamName(nation.getTag()));
-        runCmd(server, "ftbteams server join_player " + ftbTeamName(nation.getTag()) + " " + playerName);
+        String teamName = ftbTeamName(nation.getTag());
+        // Ensure team exists first (idempotent)
+        if (!runCmd(server, "ftbteams server create " + teamName)) {
+            runCmd(server, "ftbteams server create_team " + teamName);
+        }
+        // Add player — try modern syntax first, fall back to legacy
+        if (!runCmd(server, "ftbteams server join " + teamName + " " + playerName)) {
+            runCmd(server, "ftbteams server join_player " + teamName + " " + playerName);
+        }
     }
 
     /**
      * Removes a player from their former nation's FTB team.
      */
     static void removePlayerFromTeam(MinecraftServer server, String playerName, String nationTag) {
-        runCmd(server, "ftbteams server kick_player " + ftbTeamName(nationTag) + " " + playerName);
+        String teamName = ftbTeamName(nationTag);
+        if (!runCmd(server, "ftbteams server kick " + teamName + " " + playerName)) {
+            runCmd(server, "ftbteams server kick_player " + teamName + " " + playerName);
+        }
     }
 
     /**
      * Deletes the FTB server team when a nation is disbanded.
      */
     static void deleteNationTeam(MinecraftServer server, String nationTag) {
-        runCmd(server, "ftbteams server delete_team " + ftbTeamName(nationTag));
+        String teamName = ftbTeamName(nationTag);
+        if (!runCmd(server, "ftbteams server delete " + teamName)) {
+            runCmd(server, "ftbteams server delete_team " + teamName);
+        }
     }
 
     // ── Internal ─────────────────────────────────────────────────────────────────
 
-    private static void runCmd(MinecraftServer server, String command) {
+    /**
+     * Executes a command and returns true if the result code is > 0 (success).
+     */
+    private static boolean runCmd(MinecraftServer server, String command) {
         try {
             CommandSourceStack src = server.createCommandSourceStack().withSuppressedOutput();
             int result = server.getCommands().performPrefixedCommand(src, command);
             NationsForge.LOGGER.debug("[Dominion/FTBTeams] '{}' → result={}", command, result);
+            return result > 0;
         } catch (Exception e) {
             NationsForge.LOGGER.warn("[Dominion/FTBTeams] Failed: '{}' — {}", command, e.getMessage());
+            return false;
         }
     }
 }

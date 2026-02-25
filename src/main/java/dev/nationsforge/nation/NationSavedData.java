@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Persistent server-side storage for all Nations.
@@ -20,6 +21,8 @@ public class NationSavedData extends SavedData {
     private final Map<UUID, Nation> nations = new LinkedHashMap<>();
     /** player UUID → nation UUID mapping for O(1) lookups. */
     private final Map<UUID, UUID> playerNation = new HashMap<>();
+    /** Whether the world's bot nations have been generated yet. */
+    private boolean worldBotGenerated = false;
 
     // ── Factory ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +35,7 @@ public class NationSavedData extends SavedData {
 
     private static NationSavedData load(CompoundTag tag) {
         NationSavedData data = new NationSavedData();
+        data.worldBotGenerated = tag.getBoolean("worldBotGenerated");
         ListTag list = tag.getList("nations", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
             Nation n = Nation.fromNBT(list.getCompound(i));
@@ -45,6 +49,7 @@ public class NationSavedData extends SavedData {
 
     @Override
     public CompoundTag save(CompoundTag tag) {
+        tag.putBoolean("worldBotGenerated", worldBotGenerated);
         ListTag list = new ListTag();
         for (Nation n : nations.values()) {
             list.add(n.toNBT());
@@ -63,7 +68,19 @@ public class NationSavedData extends SavedData {
         setDirty();
         return nation;
     }
-
+    /**
+     * Creates a bot (AI-controlled) nation. The botLeaderId is a fake UUID that
+     * is deterministically derived from the nation's tag and is never a real player.
+     */
+    public Nation createBotNation(String name, String tag, int colour, UUID botLeaderId) {
+        UUID id = UUID.randomUUID();
+        Nation nation = new Nation(id, name, tag, colour, botLeaderId);
+        nation.setBot(true);
+        nations.put(id, nation);
+        playerNation.put(botLeaderId, id);
+        setDirty();
+        return nation;
+    }
     public void removeNation(UUID nationId) {
         Nation nation = nations.remove(nationId);
         if (nation != null) {
@@ -131,6 +148,20 @@ public class NationSavedData extends SavedData {
         return Collections.unmodifiableCollection(nations.values());
     }
 
+    /** Returns only the AI-controlled (bot) nations. */
+    public List<Nation> getBotNations() {
+        return nations.values().stream()
+                .filter(Nation::isBot)
+                .collect(Collectors.toList());
+    }
+
+    /** Returns only player-founded nations (non-bot). */
+    public List<Nation> getPlayerNations() {
+        return nations.values().stream()
+                .filter(n -> !n.isBot())
+                .collect(Collectors.toList());
+    }
+
     public boolean isNameTaken(String name) {
         return nations.values().stream()
                 .anyMatch(n -> n.getName().equalsIgnoreCase(name));
@@ -143,5 +174,15 @@ public class NationSavedData extends SavedData {
 
     public Map<UUID, UUID> getPlayerNationMap() {
         return Collections.unmodifiableMap(playerNation);
+    }
+
+    // ── World bot flag ───────────────────────────────────────────────────────────────
+
+    public boolean isWorldBotGenerated() {
+        return worldBotGenerated;
+    }
+
+    public void setWorldBotGenerated(boolean value) {
+        this.worldBotGenerated = value;
     }
 }

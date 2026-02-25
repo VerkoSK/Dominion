@@ -42,8 +42,13 @@ public class Nation {
      */
     private long power = 0L;
     private long createdAt;
-    /** Custom banner flag chosen by the nation's leaders. Never null — defaults to white. */
+    /**
+     * Custom banner flag chosen by the nation's leaders. Never null — defaults to
+     * white.
+     */
     private NationFlag flag = new NationFlag();
+    /** True if this nation is AI-controlled (bot). Bot nations are never disbanded by players. */
+    private boolean bot = false;
 
     // ── Constructor ──────────────────────────────────────────────────────────────
 
@@ -228,10 +233,20 @@ public class Nation {
         this.score = score;
     }
 
-    public NationFlag getFlag() { return flag; }
+    public NationFlag getFlag() {
+        return flag;
+    }
 
     public void setFlag(NationFlag flag) {
         this.flag = flag == null ? new NationFlag() : flag;
+    }
+
+    public boolean isBot() {
+        return bot;
+    }
+
+    public void setBot(boolean bot) {
+        this.bot = bot;
     }
 
     // ── NBT serialisation ────────────────────────────────────────────────────────
@@ -251,6 +266,7 @@ public class Nation {
         tag.putLong("power", power);
         tag.putLong("createdAt", createdAt);
         tag.put("flag", flag.toNBT());
+        tag.putBoolean("bot", bot);
 
         // Members
         ListTag memberList = new ListTag();
@@ -298,7 +314,9 @@ public class Nation {
         nation.territory = tag.getLong("territory");
         nation.power = tag.getLong("power");
         nation.createdAt = tag.getLong("createdAt");
-        if (tag.contains("flag")) nation.flag = NationFlag.fromNBT(tag.getCompound("flag"));
+        if (tag.contains("flag"))
+            nation.flag = NationFlag.fromNBT(tag.getCompound("flag"));
+        nation.bot = tag.getBoolean("bot");
 
         ListTag memberList = tag.getList("members", Tag.TAG_COMPOUND);
         for (int i = 0; i < memberList.size(); i++) {

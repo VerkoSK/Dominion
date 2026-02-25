@@ -69,10 +69,12 @@ public class SettingsPanel extends NationPanel {
                 .bounds(lx, ly, 120, 20).build());
         // Flag editor button
         add(Button.builder(Component.literal("\u00a7b\u2691 Edit Flag"), b -> {
-                    var mc = screen.getMinecraft();
-                    if (mc != null) mc.setScreen(new FlagEditorScreen(screen));
-                })
-                .bounds(lx + 128, ly, 100, 20).build());    }
+            var mc = screen.getMinecraft();
+            if (mc != null)
+                mc.setScreen(new FlagEditorScreen(screen));
+        })
+                .bounds(lx + 128, ly, 100, 20).build());
+    }
 
     private void saveSettings() {
         if (inputName == null)

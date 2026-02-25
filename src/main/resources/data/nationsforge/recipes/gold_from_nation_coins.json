@@ -1,0 +1,14 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "pattern": [
+        "CCC",
+        "CCC",
+        "CCC"
+    ],
+    "key": {
+        "C": { "item": "nationsforge:nation_coin" }
+    },
+    "result": {
+        "item": "minecraft:gold_ingot"
+    }
+}

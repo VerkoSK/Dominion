@@ -33,8 +33,8 @@ public class FlagEditorScreen extends Screen {
     // ── Layout ───────────────────────────────────────────────────────────────────
     private static final int W = 330;
     private static final int H = 250;
-    private static final int CELL = 13;   // colour-cell size
-    private static final int GAP  = 2;    // colour-cell gap
+    private static final int CELL = 13; // colour-cell size
+    private static final int GAP = 2; // colour-cell gap
 
     private final Screen parent;
     /** Working copy — edited in-place; original is not touched until Save. */
@@ -61,8 +61,8 @@ public class FlagEditorScreen extends Screen {
 
     @Override
     protected void init() {
-        left = (width  - W) / 2;
-        top  = (height - H) / 2;
+        left = (width - W) / 2;
+        top = (height - H) / 2;
         rebuildButtons();
     }
 
@@ -72,24 +72,25 @@ public class FlagEditorScreen extends Screen {
         clearWidgets();
         patternBtns.clear();
 
-        int layerRowX  = left + 158;
+        int layerRowX = left + 158;
         int layerStartY = top + 50;
-        int rowH       = 22;
+        int rowH = 22;
 
         List<NationFlag.Layer> layers = new ArrayList<>(flag.getLayers());
         for (int i = 0; i < layers.size(); i++) {
             final int idx = i;
             NationFlag.Layer layer = layers.get(i);
 
-            // Pattern cycle button (click = next, right-click = not possible via Button so use shift=prev later)
+            // Pattern cycle button (click = next, right-click = not possible via Button so
+            // use shift=prev later)
             String patName = NationFlag.patternDisplayName(layer.patternCode);
             Button pb = Button.builder(Component.literal("§7" + patName), b -> {
-                        NationFlag.Layer cur = flag.getLayers().get(idx);
-                        int pi = patternIndex(cur.patternCode);
-                        int next = (pi + 1) % NationFlag.PATTERN_CODES.length;
-                        flag.setLayer(idx, NationFlag.PATTERN_CODES[next], cur.colorId);
-                        rebuildButtons();
-                    })
+                NationFlag.Layer cur = flag.getLayers().get(idx);
+                int pi = patternIndex(cur.patternCode);
+                int next = (pi + 1) % NationFlag.PATTERN_CODES.length;
+                flag.setLayer(idx, NationFlag.PATTERN_CODES[next], cur.colorId);
+                rebuildButtons();
+            })
                     .bounds(layerRowX, layerStartY + idx * rowH, 110, 18)
                     .build();
             addRenderableWidget(pb);
@@ -98,9 +99,9 @@ public class FlagEditorScreen extends Screen {
             // Remove button
             final int fi = i;
             addRenderableWidget(Button.builder(Component.literal("§cx"), b -> {
-                        flag.removeLayer(fi);
-                        rebuildButtons();
-                    })
+                flag.removeLayer(fi);
+                rebuildButtons();
+            })
                     .bounds(layerRowX + 144, layerStartY + idx * rowH, 16, 18)
                     .build());
         }
@@ -117,7 +118,7 @@ public class FlagEditorScreen extends Screen {
 
         // Save / Cancel
         int btnY = top + H - 28;
-        btnSave   = addRenderableWidget(Button.builder(Component.literal("§aSave Flag"),
+        btnSave = addRenderableWidget(Button.builder(Component.literal("§aSave Flag"),
                 b -> save()).bounds(left + W / 2 - 90, btnY, 85, 20).build());
         btnCancel = addRenderableWidget(Button.builder(Component.literal("§7Cancel"),
                 b -> minecraft.setScreen(parent)).bounds(left + W / 2 + 5, btnY, 85, 20).build());
@@ -150,7 +151,8 @@ public class FlagEditorScreen extends Screen {
 
         // ── Right column: Layers ──────────────────────────────────────────────────
         int rx = left + 160;
-        gfx.drawString(font, "§8Layers  §7(max " + NationFlag.MAX_LAYERS + ")", rx, top + 32, NationGuiHelper.COL_TEXT_DIM, false);
+        gfx.drawString(font, "§8Layers  §7(max " + NationFlag.MAX_LAYERS + ")", rx, top + 32,
+                NationGuiHelper.COL_TEXT_DIM, false);
 
         List<NationFlag.Layer> layers = new ArrayList<>(flag.getLayers());
         int layerY = top + 50;
@@ -178,7 +180,7 @@ public class FlagEditorScreen extends Screen {
     /** Renders the banner ItemStack at 3× scale. */
     private void renderBannerPreview(GuiGraphics gfx, int x, int y) {
         var stack = flag.buildBannerStack();
-        var pose  = gfx.pose();
+        var pose = gfx.pose();
         pose.pushPose();
         pose.translate(x + 3, y, 200f);
         pose.scale(3f, 3f, 1f);
@@ -186,14 +188,16 @@ public class FlagEditorScreen extends Screen {
         pose.popPose();
     }
 
-    /** Renders a 4×4 colour grid; highlights the selected index with a white border. */
+    /**
+     * Renders a 4×4 colour grid; highlights the selected index with a white border.
+     */
     private void renderColorGrid(GuiGraphics gfx, int x, int y, int selected, int mx, int my, boolean isBase) {
         for (int ci = 0; ci < 16; ci++) {
             int col = ci % 4;
             int row = ci / 4;
             int cx2 = x + col * (CELL + GAP);
             int cy2 = y + row * (CELL + GAP);
-            int rgb  = NationFlag.DYE_COLORS_RGB[ci];
+            int rgb = NationFlag.DYE_COLORS_RGB[ci];
             gfx.fill(cx2, cy2, cx2 + CELL, cy2 + CELL, 0xFF_000000 | rgb);
             // Highlight selected
             if (ci == selected) {
@@ -216,7 +220,7 @@ public class FlagEditorScreen extends Screen {
     public boolean mouseClicked(double mx, double my, int button) {
         // Base colour grid click
         int lx = left + 8;
-        int ly = top + 28 + 78;  // y offset of base colour grid
+        int ly = top + 28 + 78; // y offset of base colour grid
         int colorIdx = hitColorGrid(lx, ly, (int) mx, (int) my);
         if (colorIdx >= 0) {
             flag.setBaseColorId(colorIdx);
@@ -248,7 +252,8 @@ public class FlagEditorScreen extends Screen {
         for (int ci = 0; ci < 16; ci++) {
             int cx2 = x + (ci % 4) * (CELL + GAP);
             int cy2 = y + (ci / 4) * (CELL + GAP);
-            if (mx >= cx2 && mx < cx2 + CELL && my >= cy2 && my < cy2 + CELL) return ci;
+            if (mx >= cx2 && mx < cx2 + CELL && my >= cy2 && my < cy2 + CELL)
+                return ci;
         }
         return -1;
     }
@@ -261,13 +266,16 @@ public class FlagEditorScreen extends Screen {
     }
 
     @Override
-    public boolean isPauseScreen() { return false; }
+    public boolean isPauseScreen() {
+        return false;
+    }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private static int patternIndex(String code) {
         for (int i = 0; i < NationFlag.PATTERN_CODES.length; i++) {
-            if (NationFlag.PATTERN_CODES[i].equals(code)) return i;
+            if (NationFlag.PATTERN_CODES[i].equals(code))
+                return i;
         }
         return 0;
     }

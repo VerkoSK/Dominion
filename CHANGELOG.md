@@ -6,9 +6,55 @@ Versioning follows **MAJOR.MINOR.PATCH** — patch bumps on every build.
 
 ---
 
+## [1.2.0] — 2026-02-25
+
+### Added
+
+- **Nation Coins** — new craftable currency (`nationsforge:nation_coin`)
+  - Craft: 1 Gold Ingot → 9 Nation Coins (and 9 coins back to 1 ingot)
+  - Uses gold-nugget texture as placeholder; model at `assets/nationsforge/models/item/nation_coin.json`
+  - `/nation deposit <amount>` — player transfers coins from inventory into national treasury
+  - `/nation withdraw <amount>` — Sovereign/Chancellor withdraws coins from treasury to inventory
+
+- **Passive treasury income** (every ~5-minute server tick cycle)
+  - `+50 coins` per online member
+  - `+10 coins` per claimed chunk (territory)
+  - `+100 coins` per active trade pact
+  - `+25 coins` per active alliance
+  - Bot nations earn separately via `BotNationAI`
+
+- **Bot Nations — World Ecosystem**
+  - On first server start for a new world, `WorldBotGenerator` creates **8–14 AI-controlled nations** seeded from the world RNG
+  - Each bot gets: random name, tag, description, colour, and procedurally generated banner flag (1–3 random layers)
+  - Starting territory (12–48 chunks) and treasury (2500–5500 coins)
+  - Initial diplomacy seeded between all bots: alliances, trade pacts, rivalries and wars
+  - Generation announced in global chat with a list of notable nations
+  - One-time per world — `worldBotGenerated` flag in `NationSavedData` prevents repetition
+
+- **Bot Nation AI** (`BotNationAI`) — driven every 5-minute tick cycle
+  - Passive income: `+10 coins/chunk` + `+30 coins/member-equivalent` + trade-pact bonus
+  - Random events (per cycle): territorial expansion, population growth, diplomacy changes
+  - World-event chat messages: expansion, war declarations, peace treaties, alliances, trade pacts, prosperity
+  - All 5 relation types used dynamically (ALLIANCE, TRADE_PACT, NEUTRAL, RIVALRY, WAR)
+
+- **Bot personality types** (`BotPersonality` enum): AGGRESSIVE, ECONOMIC, NEUTRAL, ISOLATIONIST (groundwork for future personality-weighted AI)
+
+- **`NationSavedData` additions**: `worldBotGenerated` flag, `createBotNation()`, `getBotNations()`, `getPlayerNations()`
+
+- **`Nation.isBot` field** — persisted to NBT, used to skip FTB Chunks reflection for AI nations
+
+### Fixed
+
+- **Overview flag rendering** — removed broken 2× PoseStack scaling that caused the flag to overlap the Tier label and render incorrectly; flag now drawn as a clean 16×16 GUI item at correct position
+
+- **FTB Teams commands** — `createNationTeam` / `addPlayerToTeam` / `removePlayerFromTeam` / `deleteNationTeam` now try the modern `ftbteams server create/join/kick/delete` syntax first, falling back to legacy `create_team`/`join_player`/`kick_player`/`delete_team` variants; `runCmd` now returns a `boolean` indicating success
+
+---
+
 ## [1.1.2] — 2026-02-25
 
 ### Added
+
 - **Nation Flags** — every nation can now have a custom banner-style flag
   - `NationFlag` — data model: base colour (16 dye colours) + up to 6 overlay pattern layers (24 pattern types)
   - `FlagEditorScreen` — dedicated GUI: live 3× banner preview, 4×4 base-colour picker, per-layer pattern cycle button + colour swatch, add/remove layers

@@ -124,23 +124,18 @@ public class OverviewPanel extends NationPanel {
         gfx.drawString(font, "§f" + nation.getName(), px + 22, py + 1, rgb, false);
         gfx.drawString(font, "§7[" + nation.getTag() + "]", px + 22, py + 11, NationGuiHelper.COL_TEXT_DIM, false);
 
-        // Nation flag icon — rendered at 2× scale in top-right corner of header
-        NationFlag flag = nation.getFlag();
-        if (flag != null) {
-            var flagStack = flag.buildBannerStack();
-            var pose = gfx.pose();
-            pose.pushPose();
-            pose.translate(x + w - 46, y + 2, 200f);
-            pose.scale(2f, 2f, 1f);
-            gfx.renderItem(flagStack, 0, 0);
-            pose.popPose();
-        }
-
-        // Power tier badge (top-right)
+        // Power tier badge — top-right, just below the header top edge
         NationPowerCalculator.Tier tier = NationPowerCalculator.getTier(nation.getPower());
         int tierCol = tier.colour & 0xFFFFFF;
         String tierLabel = "§7Tier: §f" + tier.displayName;
-        gfx.drawString(font, tierLabel, x + w - font.width(tier.displayName) - 50, py + 4, tierCol, false);
+        gfx.drawString(font, tierLabel, x + w - font.width("Tier: " + tier.displayName) - 6, py + 4, tierCol, false);
+
+        // Nation flag icon — rendered as a standard 16×16 GUI item below the tier label
+        NationFlag flag = nation.getFlag();
+        if (flag != null) {
+            var flagStack = flag.buildBannerStack();
+            gfx.renderItem(flagStack, x + w - 22, py + 16);
+        }
 
         py += 24;
 
