@@ -1,0 +1,16 @@
+{
+    "key.nationsforge.open_nations": "Open Dominion",
+    "key.categories.nationsforge": "Dominion",
+    "screen.nationsforge.main": "Dominion",
+    "screen.nationsforge.create": "Found a Nation",
+    "nationsforge.rank.sovereign": "Sovereign",
+    "nationsforge.rank.chancellor": "Chancellor",
+    "nationsforge.rank.general": "General",
+    "nationsforge.rank.diplomat": "Diplomat",
+    "nationsforge.rank.citizen": "Citizen",
+    "nationsforge.relation.alliance": "Alliance",
+    "nationsforge.relation.trade_pact": "Trade Pact",
+    "nationsforge.relation.neutral": "Neutral",
+    "nationsforge.relation.rivalry": "Rivalry",
+    "nationsforge.relation.war": "War"
+}
